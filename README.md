@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # 🤖 Miko3 Talents Automation Framework
 
 > **Full ADB + Python Automation Framework** for testing Miko3 Reboot's talents with built-in verification, HTML reporting, and RICE POT prioritization.
@@ -534,3 +535,7 @@ Miko3 Talents Automation/
 ## License
 
 Internal use — Miko3 QA Automation Team.
+=======
+# Miko3_talent_automation_code
+This repository consists of different talent automation code
+>>>>>>> a4d01929d722450c13bafb1ace7fd70296dd0a92

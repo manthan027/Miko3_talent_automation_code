@@ -1,0 +1,15 @@
+{
+  "test_name": "vooks",
+  "timestamp": "2026-04-02T18:47:14.682258",
+  "timestamp_unix": 1775135834.6822672,
+  "state": {
+    "current_step": 13,
+    "step_name": "Step 13: Seek Backward Video 1",
+    "package_name": "com.miko.vooks",
+    "activity_name": ""
+  },
+  "metadata": {
+    "step_count": 13,
+    "last_action": "Step 13: Seek Backward Video 1"
+  }
+}

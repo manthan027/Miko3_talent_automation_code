@@ -1,0 +1,151 @@
+# ============================================================================
+# Miko3 Talents Automation Framework - Configuration
+# ============================================================================
+
+# --- Device Settings ---
+device:
+  serial: ""                        # Leave empty for auto-detect, or set e.g. "192.168.1.100:5555"
+  adb_path: "adb"                   # Full path to ADB binary if not in PATH
+  connection_timeout: 30            # Seconds to wait for device connection
+  command_timeout: 15               # Default timeout for ADB commands (seconds)
+  retry_attempts: 3                 # Number of retries for failed ADB commands
+  retry_delay: 2                    # Seconds between retries
+  stay_awake: true                  # Keep screen on during tests
+  brightness: 127                   # Screen brightness (0-255) - 50% for battery saving
+
+# --- Screen Properties ---
+screen:
+  width: 1280                       # Miko3 screen width in pixels
+  height: 800                       # Miko3 screen height in pixels
+  density: 213                      # Screen density (dpi)
+
+# --- Talent Package Mappings ---
+# Update these with actual Miko3 package names discovered via `adb shell pm list packages | grep miko`
+talents:
+  video:
+    package: "com.miko.mikoji"
+    activity: ".MainActivity"
+    display_name: "Video Talent"
+    coordinates:
+      play_button: [640, 400]
+      next_button: [1100, 750]
+      back_button: [180, 50]
+      pause_button: [640, 400]
+    timings:
+      video_load_wait: 5            # Seconds to wait for video to load
+      video_play_duration: 10       # Max seconds to wait per video
+      between_videos: 3             # Seconds between video transitions
+    max_videos: 10                  # Maximum videos to cycle through
+    video_count_validation:
+      enabled: true
+      baseline_file: "reports/video_count_baseline.json"
+      unexpected_drop_threshold: 0   # Fail if count drops to this level
+      unexpected_spike_threshold: 50  # Fail if count exceeds this level
+      video_text_keywords:           # Keywords to identify video elements in UI dump
+        - "video"
+        - "play"
+        - "thumbnail"
+
+  storymaker:
+    package: "com.miko.story_maker"
+    activity: ".MainActivity"
+    display_name: "Storymaker"
+    coordinates:
+      disclaimer_cross: [1150, 80]
+      start_button: [640, 500]
+      create_story: [640, 600]
+      no_button: [400, 600]
+      yes_button: [800, 600]
+      next_step: [1100, 750]
+      finish_button: [640, 700]
+    timings:
+      load_wait: 10
+      animation_wait: 3
+      step_delay: 2
+      conversation_wait: 15
+      num_questions: 6
+
+  vooks:
+    package: "com.miko.vooks"
+    activity: ""
+    display_name: "Vooks"
+    coordinates:
+      story_list_first: [300, 400]    # First thumbnail position
+      play_button: [640, 400]         # Center play/pause toggle
+      pause_button: [640, 400]        # Center
+      cross_button: [1200, 60]        # Top-right cross icon (estimate)
+      seek_bar_y: [700]               # Y-coordinate of scrubber bar
+    timings:
+      load_wait: 5
+      video_load_wait: 15             # Handles video loading delay
+      play_duration: 15               # Default play duration to test
+      session_timeout: 120
+
+  adventure_book:
+    package: "com.miko.adventurebook"
+    activity: ".MainActivity"
+    display_name: "My Adventure Book"
+    coordinates:
+      story_list_first: [640, 200]
+      page_next: [1100, 400]
+    timings:
+      load_wait: 10
+      page_duration: 10
+      session_timeout: 120
+
+# --- Third-Party Talent Defaults ---
+thirdparty:
+  default_launch_wait: 5            # Seconds to wait after launching
+  smoke_test_duration: 10           # Seconds to keep talent open for smoke test
+  interaction_delay: 2              # Seconds between interactions
+
+# --- Verification Settings ---
+verification:
+  screenshot_dir: "reports/screenshots"
+  screenshot_diff_threshold: 0.05   # 5% pixel difference threshold
+  logcat_buffer_size: 4096          # Lines of logcat to capture
+  crash_patterns:
+    - "FATAL EXCEPTION"
+    - "ANR in"
+    - "has died"
+    - "Force finishing activity"
+  success_patterns:
+    - "Activity resumed"
+    - "Displayed"
+
+# --- Reporting Settings ---
+reporting:
+  output_dir: "reports"
+  report_filename: "miko3_test_report_{timestamp}.html"
+  embed_screenshots: true
+  max_log_lines: 200
+
+# --- RICE POT Default Scores ---
+# Scores: 1-10 scale (Effort is inverted: higher = less effort = better)
+rice_pot:
+  video:
+    reach: 9
+    impact: 8
+    confidence: 7
+    effort: 5
+  storymaker:
+    reach: 7
+    impact: 7
+    confidence: 6
+    effort: 4
+  vooks:
+    reach: 8
+    impact: 8
+    confidence: 7
+    effort: 6
+  thirdparty:
+    reach: 5
+    impact: 6
+    confidence: 4
+    effort: 3
+
+# --- Logging ---
+logging:
+  level: "INFO"                     # DEBUG, INFO, WARNING, ERROR
+  log_file: "reports/automation.log"
+  console_output: true

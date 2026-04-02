@@ -1,0 +1,15 @@
+{
+  "test_name": "video",
+  "timestamp": "2026-04-02T00:36:45.127147",
+  "timestamp_unix": 1775070405.1271667,
+  "state": {
+    "current_step": 5,
+    "step_name": "Step 5: Count videos in Video Talent section",
+    "package_name": "com.miko.mikoji",
+    "activity_name": ".MainActivity"
+  },
+  "metadata": {
+    "step_count": 5,
+    "last_action": "Step 5: Count videos in Video Talent section"
+  }
+}

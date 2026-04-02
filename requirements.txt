@@ -1,0 +1,6 @@
+# Miko3 Talents Automation Framework - Dependencies
+PyYAML>=6.0
+Jinja2>=3.1.0
+Pillow>=10.0.0
+pytest>=7.0.0
+colorama>=0.4.6
