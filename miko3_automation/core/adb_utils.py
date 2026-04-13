@@ -142,12 +142,13 @@ class ADBClient:
                 logger.debug(
                     "ADB [attempt %d/%d]: %s", attempt, attempts, " ".join(cmd)
                 )
+                # No shell=True on Windows unless necessary; it can lead to hangs.
                 result = subprocess.run(
                     cmd,
                     capture_output=True,
                     text=True,
                     timeout=effective_timeout,
-                    shell=self.is_windows,
+                    shell=False,
                 )
                 if result.returncode != 0:
                     error_msg = result.stderr.strip() or result.stdout.strip()

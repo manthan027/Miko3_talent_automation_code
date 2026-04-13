@@ -20,13 +20,14 @@ class StorymakerTalentTest(BaseTalentTest):
 
     Test Flow:
     1. Launch storymaker talent
-    2. Tap the Start/Create Story button
-    3. Select a character from the character selection screen
-    4. Select a background/scene
-    5. Select story elements/objects
-    6. Advance through creation steps via Next button
-    7. Tap Finish/Complete to finalize the story
-    8. Verify story creation completed successfully
+    2. Dismiss AI disclaimer popup
+    3. Tap the Start/Create Story button
+    4. Select a character from the character selection screen
+    5. Select a background/scene
+    6. Select story elements/objects
+    7. Advance through creation steps via Next button
+    8. Tap Finish/Complete to finalize the story
+    9. Verify story creation completed successfully
 
     Configuration (from config.yaml → talents.storymaker):
         - coordinates.start_button: [x, y]

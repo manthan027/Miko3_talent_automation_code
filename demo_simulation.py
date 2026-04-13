@@ -8,66 +8,73 @@ from unittest.mock import MagicMock, patch
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from miko3_automation.core.adb_utils import ADBClient
-from miko3_automation.core.device_manager import DeviceManager
-from miko3_automation.talents.storymaker_talent import StorymakerTalentTest
+from miko3_automation.talents.storymaker_new_user_flow import StorymakerNewUserFlowTest
 
-# Setup logging to console
+# Setup logging to console to match the format the user sees
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)-7s] %(name)s: %(message)s",
-    datefmt="%H:%M:%S"
+    datefmt="%Y-%m-%d %H:%M:%S"
 )
+logger = logging.getLogger("Demo")
 
 def run_demo():
-    print("\n" + "="*60)
-    print("🎬 MIKO3 AUTOMATION - UI VISIBILITY DEMO (SIMULATION)")
-    print("="*60 + "\n")
+    print("\n" + "="*70)
+    print("MIKO3 AUTOMATION - OPTIMIZED LAUNCH SEQUENCE DEMO")
+    print("="*70 + "\n")
 
+    # Mock Config matching the user's actual setup
     config = {
-        "device": {"serial": "MIKO3-SIM-123"},
+        "device": {"serial": "MIKO3-SIM-ABC", "brightness": 127},
         "talents": {
             "storymaker": {
-                "package": "com.miko.storymaker",
+                "package": "com.miko.story_maker",
                 "activity": ".MainActivity",
-                "display_name": "Storymaker Talent",
-                "coordinates": {"start_button": [640, 500]},
-                "timings": {"load_wait": 0.1, "animation_wait": 0.1}
+                "display_name": "Storymaker",
+                "launch_method": "click",
+                "app_icon_coordinates": [933, 212],
+                "pre_clicks": [[1207, 644]], # Apps Button
+                "coordinates": {
+                    "ai_disclaimer_cross": [154, 120]
+                },
+                "timings": {
+                    "load_wait": 0.5,
+                    "animation_wait": 0.5
+                }
             }
         },
         "verification": {"screenshot_dir": "reports/screenshots"}
     }
 
-    # Mock subprocess.run to show what ADB commands are being sent
+    # Mock ADB and Discover dependencies
     with patch("miko3_automation.core.adb_utils.subprocess.run") as mock_run, \
-         patch("miko3_automation.core.adb_utils.shutil.which", return_value="/usr/bin/adb"), \
-         patch("miko3_automation.core.adb_utils.ADBClient.get_connected_devices", return_value=[{"serial": "MIKO3-SIM-123", "status": "device"}]), \
-         patch("miko3_automation.core.adb_utils.ADBClient.shell", side_effect=lambda x: f"Mock Shell Output: {x}"):
+         patch("miko3_automation.core.adb_utils.shutil.which", return_value="adb"), \
+         patch("miko3_automation.core.adb_utils.ADBClient.shell", return_value=""), \
+         patch("miko3_automation.core.adb_utils.ADBClient.tap") as mock_tap, \
+         patch("miko3_automation.core.adb_utils.ADBClient.wait_for_activity", return_value=True):
 
-        print("🚀 [Step 1] Initializing Device Manager...")
-        dm = DeviceManager(config)
+        # Initializing Talent Test
+        adb = ADBClient(device_serial="MIKO3-SIM-ABC")
+        test = StorymakerNewUserFlowTest(adb, config)
         
-        print("\n🛠️ [Step 2] Ensuring Device is Ready (The New Logic)...")
-        print("   (This will now wake the screen, set brightness, and stay awake)")
-        dm.ensure_ready()
-
-        print("\n📦 [Step 3] Initializing Storymaker Talent Test...")
-        adb = dm.get_device()
-        test = StorymakerTalentTest(adb, config)
-
-        print("\n🛫 [Step 4] Launching Talent (With Improved Flags)...")
-        # Mocking methods to avoid file IO or complex logic in simulation
+        # Mocking screenshot to avoid file IO errors
         test.take_screenshot = MagicMock()
-        test.discovery.launch_talent = MagicMock(return_value=True)
+
+        print("--- STARTING SIMULATION ---")
+        print("This demo shows how Step 4 (Category Search) is now skipped for 'click' talents.")
+        print("-" * 70)
+        
+        # Execute the Setup phase which contains the optimized logic
         test.setup()
 
-    print("\n" + "="*60)
-    print("✅ DEMO COMPLETE")
-    print("The logs above show the exact sequence of improvements:")
-    print("1. Waking screen via KEYCODE_WAKEUP (224)")
-    print("2. Setting brightness to 255")
-    print("3. Setting power mode to Stay Awake (usb)")
-    print("4. Launching with wait flags and foreground priority")
-    print("="*60 + "\n")
+    print("\n" + "="*70)
+    print("DONE: DEMO COMPLETE")
+    print("\nOBSERVATIONS:")
+    print("1. [Step 2] Navigate to Home: Triggered successfully.")
+    print("2. [Step 3] Open Apps Drawer: Used coordinate [1207, 644] directly (No text search).")
+    print("3. [Step 4] Navigate to talent category: SKIPPED entirely (No failure for 'Stories' tab).")
+    print("4. [Step 6] Launch talent: Used icon coordinates [933, 212] immediately.")
+    print("="*70 + "\n")
 
 if __name__ == "__main__":
     run_demo()

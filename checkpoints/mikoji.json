@@ -1,0 +1,15 @@
+{
+  "test_name": "mikoji",
+  "timestamp": "2026-04-09T23:59:43.312423",
+  "timestamp_unix": 1775759383.312439,
+  "state": {
+    "current_step": 5,
+    "step_name": "Step 5: Force stop talent",
+    "package_name": "com.miko.mikoji",
+    "activity_name": ".MainActivity"
+  },
+  "metadata": {
+    "step_count": 5,
+    "last_action": "Step 5: Force stop talent"
+  }
+}

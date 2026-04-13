@@ -327,6 +327,163 @@ class TalentDiscovery:
             logger.error("Failed to launch %s: %s", component, e)
             return False
 
+    def launch_talent_by_click(
+        self,
+        package: str,
+        coordinates: tuple,
+        wait_before: float = 1.0,
+        wait_after: float = 3.0,
+        pre_clicks: Optional[List[tuple]] = None,
+    ) -> bool:
+        """
+        Launch a talent by clicking on its icon or location.
+
+        Args:
+            package: Package name to verify after launch.
+            coordinates: (x, y) tuple for clicking the app icon.
+            wait_before: Seconds to wait before clicking (for screen prep).
+            wait_after: Seconds to wait after clicking (for app to launch).
+            pre_clicks: Optional list of [(x, y), ...] to click before launching.
+
+        Returns:
+            True if talent launched successfully.
+        """
+        import time
+
+        try:
+            # Execute pre-launch clicks if provided
+            if pre_clicks:
+                logger.info("Executing %d pre-launch clicks", len(pre_clicks))
+                for idx, (x, y) in enumerate(pre_clicks, 1):
+                    logger.info("Pre-click %d: (%d, %d)", idx, x, y)
+                    self.adb.tap(x, y)
+                    time.sleep(0.5)  # Brief pause between pre-clicks
+
+            # Wait before main launch click
+            if wait_before > 0:
+                time.sleep(wait_before)
+
+            # Click the app icon
+            logger.info("Clicking app icon at (%d, %d)", coordinates[0], coordinates[1])
+            self.adb.tap(coordinates[0], coordinates[1])
+
+            # Wait after click for app to launch
+            if wait_after > 0:
+                time.sleep(wait_after)
+
+            # Verify the app launched
+            if not self.adb.wait_for_activity(package, timeout=10):
+                logger.warning("Activity did not appear after click: %s", package)
+                return False
+
+            logger.info("Successfully launched %s via click", package)
+            return True
+
+        except Exception as e:
+            logger.error("Failed to launch %s by click: %s", package, e)
+            return False
+
+    def launch_talent_via_search(
+        self,
+        package: str,
+        apps_button_coords: tuple,
+        search_icon_coords: tuple,
+        search_text: str,
+        search_result_coords: Optional[tuple] = None,
+        wait_before_apps: float = 0.5,
+        wait_after_apps: float = 1.5,
+        wait_after_type: float = 1.5,
+        wait_after_click: float = 2.0,
+    ) -> bool:
+        """
+        Launch a talent by searching for it in the apps drawer.
+
+        Flow:
+        1. Click on Apps button (from home screen)
+        2. Wait for apps drawer to open
+        3. Click on search icon
+        4. Wait for search box to appear
+        5. Type talent name
+        6. Wait for search results
+        7. Click on search result
+        8. Close keyboard
+        9. Wait for app to launch
+
+        Args:
+            package: Package name to verify after launch.
+            apps_button_coords: (x, y) coordinates of Apps button on home screen.
+            search_icon_coords: (x, y) coordinates of search icon inside apps drawer.
+            search_text: Text to search (e.g., "Storymaker", "Vooks").
+            search_result_coords: (x, y) coordinates of search result to click.
+                                  If None, tries to auto-detect by finding text.
+            wait_before_apps: Seconds to wait before clicking apps button.
+            wait_after_apps: Seconds to wait after apps drawer opens.
+            wait_after_type: Seconds to wait after typing search text.
+            wait_after_click: Seconds to wait after clicking search result.
+
+        Returns:
+            True if talent launched successfully.
+        """
+        import time
+
+        try:
+            # Step 1: Click Apps button
+            if wait_before_apps > 0:
+                time.sleep(wait_before_apps)
+
+            logger.info("Clicking Apps button at (%d, %d)", apps_button_coords[0], apps_button_coords[1])
+            self.adb.tap(apps_button_coords[0], apps_button_coords[1])
+            time.sleep(wait_after_apps)
+            logger.info("Apps drawer opened")
+
+            # Step 2: Click search icon
+            logger.info("Clicking search icon at (%d, %d)", search_icon_coords[0], search_icon_coords[1])
+            self.adb.tap(search_icon_coords[0], search_icon_coords[1])
+            time.sleep(0.5)
+            logger.info("Search box opened")
+
+            # Step 3: Type search text
+            logger.info("Typing search text: %s", search_text)
+            self.adb.input_text(search_text)
+            time.sleep(wait_after_type)
+            logger.info("Search results loaded")
+
+            # Step 4: Click on search result
+            if search_result_coords:
+                logger.info("Clicking search result at (%d, %d)", search_result_coords[0], search_result_coords[1])
+                self.adb.tap(search_result_coords[0], search_result_coords[1])
+            else:
+                # Try to auto-detect search result by tapping on text matching the search query
+                logger.info("Auto-detecting search result for text: %s", search_text)
+                # Fallback: try clicking in the center area where results typically appear
+                result_y = search_icon_coords[1] + 150  # Below search icon
+                result_x = search_icon_coords[0]
+                logger.info("Clicking auto-detected result area at (%d, %d)", result_x, result_y)
+                self.adb.tap(result_x, result_y)
+
+            time.sleep(0.5)
+
+            # Step 5: Close keyboard (KEYCODE_BACK = 4)
+            logger.info("Closing keyboard")
+            self.adb.key_event(4)
+            time.sleep(0.5)
+
+            # Step 6: Wait for app to launch
+            if wait_after_click > 0:
+                time.sleep(wait_after_click)
+
+            # Verify the app launched
+            if not self.adb.wait_for_activity(package, timeout=10):
+                logger.warning("Activity did not appear after search launch: %s", package)
+                return False
+
+            logger.info("Successfully launched %s via search", package)
+            return True
+
+        except Exception as e:
+            logger.error("Failed to launch %s via search: %s", package, e)
+            return False
+
     def force_stop(self, package: str) -> str:
         """
         Force stop a talent.

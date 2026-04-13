@@ -14,11 +14,12 @@ logger = logging.getLogger(__name__)
 @dataclass
 class RICEScore:
     """RICE POT score for a single talent."""
+
     talent_name: str
-    reach: int          # 1-10: How many users/scenarios does this cover?
-    impact: int         # 1-10: How significant is the quality/time improvement?
-    confidence: int     # 1-10: How sure are we the automation works reliably?
-    effort: int         # 1-10: Inverted — higher = less effort = better
+    reach: int  # 1-10: How many users/scenarios does this cover?
+    impact: int  # 1-10: How significant is the quality/time improvement?
+    confidence: int  # 1-10: How sure are we the automation works reliably?
+    effort: int  # 1-10: Inverted — higher = less effort = better
 
     @property
     def rice_score(self) -> float:
@@ -83,7 +84,7 @@ class RICEPOTAnalyzer:
 
     # Default scores if not in config
     DEFAULT_SCORES = {
-        "video": {"reach": 9, "impact": 8, "confidence": 7, "effort": 5},
+        "mikoji": {"reach": 9, "impact": 8, "confidence": 7, "effort": 5},
         "storymaker": {"reach": 7, "impact": 7, "confidence": 6, "effort": 4},
         "storytelling": {"reach": 8, "impact": 8, "confidence": 7, "effort": 6},
         "thirdparty": {"reach": 5, "impact": 6, "confidence": 4, "effort": 3},
@@ -91,9 +92,9 @@ class RICEPOTAnalyzer:
 
     # Detailed justifications for each score
     JUSTIFICATIONS = {
-        "video": {
-            "reach": "Video is used by most Miko3 users; covers multiple video types",
-            "impact": "Automating video saves significant manual testing time (10+ videos)",
+        "mikoji": {
+            "reach": "Mikoji is used by most Miko3 users; covers multiple video types",
+            "impact": "Automating Mikoji saves significant manual testing time (10+ videos)",
             "confidence": "Video playback is predictable; play/next buttons are consistent",
             "effort": "Moderate effort — needs coordinate calibration per device model",
         },
@@ -131,7 +132,7 @@ class RICEPOTAnalyzer:
         Get the RICE score for a specific talent.
 
         Args:
-            talent_key: Talent identifier (e.g., "video", "storymaker").
+            talent_key: Talent identifier (e.g., "mikoji", "storymaker").
 
         Returns:
             RICEScore dataclass.
@@ -139,13 +140,13 @@ class RICEPOTAnalyzer:
         # Use config scores, fall back to defaults
         scores = self.config_scores.get(
             talent_key,
-            self.DEFAULT_SCORES.get(talent_key, {
-                "reach": 5, "impact": 5, "confidence": 5, "effort": 5
-            }),
+            self.DEFAULT_SCORES.get(
+                talent_key, {"reach": 5, "impact": 5, "confidence": 5, "effort": 5}
+            ),
         )
 
         display_names = {
-            "video": "Video Talent",
+            "mikoji": "Mikoji Talent",
             "storymaker": "Storymaker Talent",
             "storytelling": "Storytelling Talent",
             "thirdparty": "Third-Party Talents",
@@ -166,7 +167,7 @@ class RICEPOTAnalyzer:
         Returns:
             List of RICEScore objects.
         """
-        talents = ["video", "storymaker", "storytelling", "thirdparty"]
+        talents = ["mikoji", "storymaker", "storytelling", "thirdparty"]
         scores = [self.get_score(t) for t in talents]
         return scores
 
@@ -218,14 +219,16 @@ class RICEPOTAnalyzer:
                 f"{score.rice_score:>8.1f} {score.priority_label:<15}"
             )
 
-        lines.extend([
-            "",
-            "-" * 70,
-            "Formula: Score = (Reach × Impact × Confidence) / Effort",
-            "Scale: 1-10 for each dimension (Effort inverted: higher = less effort)",
-            "",
-            "RECOMMENDATION:",
-        ])
+        lines.extend(
+            [
+                "",
+                "-" * 70,
+                "Formula: Score = (Reach × Impact × Confidence) / Effort",
+                "Scale: 1-10 for each dimension (Effort inverted: higher = less effort)",
+                "",
+                "RECOMMENDATION:",
+            ]
+        )
 
         if prioritized:
             top = prioritized[0]
@@ -254,6 +257,6 @@ class RICEPOTAnalyzer:
             "summary": self.generate_summary(),
             "justifications": {
                 key: self.get_justifications(key)
-                for key in ["video", "storymaker", "storytelling", "thirdparty"]
+                for key in ["mikoji", "storymaker", "storytelling", "thirdparty"]
             },
         }

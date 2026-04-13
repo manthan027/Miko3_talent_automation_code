@@ -7,7 +7,7 @@ REM
 REM Usage:
 REM   scripts\run_all_tests.bat
 REM   scripts\run_all_tests.bat --verbose
-REM   scripts\run_all_tests.bat --talent video
+REM   scripts\run_all_tests.bat --talent mikoji
 REM ============================================================================
 
 echo.

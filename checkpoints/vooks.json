@@ -1,15 +1,15 @@
 {
   "test_name": "vooks",
-  "timestamp": "2026-04-02T18:47:14.682258",
-  "timestamp_unix": 1775135834.6822672,
+  "timestamp": "2026-04-02T21:29:24.153449",
+  "timestamp_unix": 1775145564.153468,
   "state": {
-    "current_step": 13,
-    "step_name": "Step 13: Seek Backward Video 1",
+    "current_step": 7,
+    "step_name": "Step 7: Verify launch",
     "package_name": "com.miko.vooks",
-    "activity_name": ""
+    "activity_name": ".game.view.activity.GameActivity"
   },
   "metadata": {
-    "step_count": 13,
-    "last_action": "Step 13: Seek Backward Video 1"
+    "step_count": 7,
+    "last_action": "Step 7: Verify launch"
   }
 }

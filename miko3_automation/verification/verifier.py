@@ -368,3 +368,57 @@ class Verifier:
             logger.warning("Evidence logcat failed: %s", e)
 
         return evidence
+
+    def verify_splash_screen(
+        self,
+        talent_name: str,
+        screenshot_path: str,
+        comparison_method: str = "auto",
+    ) -> VerificationResult:
+        """
+        Verify a talent's splash screen against reference template.
+
+        Uses OpenCV for visual comparison. Supports template matching and SSIM.
+
+        Args:
+            talent_name: Name of the talent (e.g., "adventure_book").
+            screenshot_path: Path to captured screenshot.
+            comparison_method: "template", "ssim", or "auto" (auto-selects best).
+
+        Returns:
+            VerificationResult indicating if splash screen matches reference.
+
+        Notes:
+            - Requires reference template at templates/splash_screens/{talent_name}_splash.png
+            - Auto method tries SSIM first (more robust), falls back to template matching
+        """
+        try:
+            from .splash_screen_verifier import SplashScreenVerifier
+
+            verifier = SplashScreenVerifier()
+            result = verifier.verify_talent_splash(talent_name, screenshot_path)
+
+            return VerificationResult(
+                check_name=f"Splash Screen: {talent_name}",
+                passed=result.passed,
+                message=result.message,
+                evidence_path=result.evidence_path or result.capture_path,
+                details=f"Method: {result.method} | Score: {result.similarity_score:.1%} ({result.reference_path})",
+            )
+
+        except ImportError as e:
+            logger.error(f"OpenCV dependencies not available: {e}")
+            return VerificationResult(
+                check_name=f"Splash Screen: {talent_name}",
+                passed=False,
+                message="OpenCV dependencies not installed. Run: pip install opencv-python scikit-image",
+                details=str(e),
+            )
+        except Exception as e:
+            logger.error(f"Splash screen verification error: {e}")
+            return VerificationResult(
+                check_name=f"Splash Screen: {talent_name}",
+                passed=False,
+                message=f"Splash screen verification failed: {str(e)}",
+                details=f"Screenshot: {screenshot_path}",
+            )

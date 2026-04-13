@@ -21,7 +21,7 @@ from miko3_automation.verification.verifier import Verifier, VerificationResult
 from miko3_automation.rice_pot.analyzer import RICEPOTAnalyzer, RICEScore
 from miko3_automation.reporting.html_report import HTMLReportGenerator
 from miko3_automation.talents.base_talent import TestResult, TestStep, TestStatus
-from miko3_automation.talents.video_talent import VideoTalentTest
+from miko3_automation.talents.mikoji_talent import MikojiTalentTest
 
 
 # ============================================================================
@@ -263,7 +263,7 @@ class TestRICEPOTAnalyzer(unittest.TestCase):
     def setUp(self):
         self.config = {
             "rice_pot": {
-                "video": {"reach": 9, "impact": 8, "confidence": 7, "effort": 5},
+                "mikoji": {"reach": 9, "impact": 8, "confidence": 7, "effort": 5},
                 "storymaker": {"reach": 7, "impact": 7, "confidence": 6, "effort": 4},
                 "vooks": {"reach": 8, "impact": 8, "confidence": 7, "effort": 6},
                 "thirdparty": {"reach": 5, "impact": 6, "confidence": 4, "effort": 3},
@@ -285,7 +285,7 @@ class TestRICEPOTAnalyzer(unittest.TestCase):
     def test_generate_summary_contains_content(self):
         """Summary should contain talent names and scores."""
         summary = self.analyzer.generate_summary()
-        self.assertIn("Video Talent", summary)
+        self.assertIn("Mikoji Talent", summary)
         self.assertIn("RICE POT", summary)
         self.assertIn("RECOMMENDATION", summary)
 
@@ -367,7 +367,7 @@ class TestHTMLReportGenerator(unittest.TestCase):
                 "embed_screenshots": False,
             },
             "rice_pot": {
-                "video": {"reach": 9, "impact": 8, "confidence": 7, "effort": 5},
+                "mikoji": {"reach": 9, "impact": 8, "confidence": 7, "effort": 5},
                 "storymaker": {"reach": 7, "impact": 7, "confidence": 6, "effort": 4},
                 "disney.stories": {
                     "reach": 8,
@@ -432,7 +432,7 @@ class TestHTMLReportGenerator(unittest.TestCase):
 
 
 # ============================================================================
-# Video Talent - CLEAR Framework Validation Tests
+# Mikoji Talent - CLEAR Framework Validation Tests
 # ============================================================================
 
 
@@ -449,7 +449,7 @@ class TestVideoCountBaseline(unittest.TestCase):
             os.unlink(self.baseline_file)
 
     def _make_test(self, **config_overrides):
-        """Create a VideoTalentTest with mocked ADB."""
+        """Create a MikojiTalentTest with mocked ADB."""
         mock_adb = MagicMock()
         mock_adb.get_current_activity.return_value = ""
         mock_adb.get_current_package.return_value = ""
@@ -457,7 +457,7 @@ class TestVideoCountBaseline(unittest.TestCase):
         mock_adb.count_ui_elements.return_value = {"count": 0, "elements": []}
         config = {
             "talents": {
-                "video": {
+                "mikoji": {
                     "package": "com.miko.test",
                     "display_name": "Test Video",
                     "activity": ".MainActivity",
@@ -474,7 +474,7 @@ class TestVideoCountBaseline(unittest.TestCase):
             "verification": {},
             "device": {},
         }
-        return VideoTalentTest(adb=mock_adb, config=config)
+        return MikojiTalentTest(adb=mock_adb, config=config)
 
     def test_save_and_load_baseline(self):
         """Baseline file should save and load correctly."""
@@ -510,13 +510,13 @@ class TestVideoCountValidation(unittest.TestCase):
             os.unlink(self.baseline_file)
 
     def _make_test(self, current_count=10, previous_count=10):
-        """Create a VideoTalentTest with mocked ADB and preset counts."""
+        """Create a MikojiTalentTest with mocked ADB and preset counts."""
         mock_adb = MagicMock()
         mock_adb.get_current_activity.return_value = ""
         mock_adb.get_current_package.return_value = ""
         config = {
             "talents": {
-                "video": {
+                "mikoji": {
                     "package": "com.miko.test",
                     "display_name": "Test Video",
                     "activity": ".MainActivity",
@@ -532,7 +532,7 @@ class TestVideoCountValidation(unittest.TestCase):
             "verification": {},
             "device": {},
         }
-        test = VideoTalentTest(adb=mock_adb, config=config)
+        test = MikojiTalentTest(adb=mock_adb, config=config)
         test.current_video_count = current_count
         test._save_baseline(previous_count)
         return test
@@ -594,7 +594,7 @@ class TestVideoBestPracticesValidation(unittest.TestCase):
         mock_adb = MagicMock()
         config = {
             "talents": {
-                "video": {
+                "mikoji": {
                     "package": "com.miko.test",
                     "display_name": "Test Video",
                     "activity": ".MainActivity",
@@ -607,7 +607,7 @@ class TestVideoBestPracticesValidation(unittest.TestCase):
             "verification": {},
             "device": {},
         }
-        return VideoTalentTest(adb=mock_adb, config=config)
+        return MikojiTalentTest(adb=mock_adb, config=config)
 
     def test_best_practices_pass_with_titles(self):
         """Should pass when video titles are found and no duplicates."""

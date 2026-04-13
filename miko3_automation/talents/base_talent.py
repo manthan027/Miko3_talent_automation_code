@@ -17,6 +17,8 @@ from typing import List, Optional
 from ..core.adb_utils import ADBClient, ADBError
 from ..core.talent_discovery import TalentDiscovery
 from ..core.checkpoint import CheckpointManager
+from ..core.audio_utils import AudioUtils
+from ..core.tts_utils import TextToSpeech
 from ..verification.verifier import Verifier, VerificationResult
 
 logger = logging.getLogger(__name__)
@@ -163,6 +165,10 @@ class BaseTalentTest(ABC):
         self.screenshot_dir = screenshot_dir
         self.discovery = TalentDiscovery(adb)
         self.verifier = Verifier(adb, config)
+
+        # Audio and TTS support
+        self.audio = AudioUtils(adb)
+        self.tts = TextToSpeech(output_dir="audio")
 
         # Checkpoint support
         self._checkpoint_enabled = enable_checkpoints
@@ -414,6 +420,225 @@ class BaseTalentTest(ABC):
         self.result.verifications.append(result)
         return result
 
+    def verify_splash_screen(
+        self, talent_name: Optional[str] = None, screenshot_path: Optional[str] = None
+    ) -> VerificationResult:
+        """
+        Verify a talent's splash screen against reference template.
+
+        Uses OpenCV for visual comparison.
+
+        Args:
+            talent_name: Name of the talent (defaults to self.talent_name).
+            screenshot_path: Path to screenshot (defaults to last captured screenshot).
+
+        Returns:
+            VerificationResult indicating if splash screen matches reference.
+
+        Usage:
+            self.take_screenshot("splash")
+            result = self.verify_splash_screen()
+        """
+        effective_talent = talent_name or self.talent_name
+        if not screenshot_path:
+            # Use the last captured screenshot
+            if self.result.screenshots:
+                screenshot_path = self.result.screenshots[-1]
+            else:
+                result = VerificationResult(
+                    check_name=f"Splash Screen: {effective_talent}",
+                    passed=False,
+                    message="No screenshot captured for splash screen verification",
+                )
+                self.result.verifications.append(result)
+                return result
+
+        result = self.verifier.verify_splash_screen(effective_talent, screenshot_path)
+        self.result.verifications.append(result)
+        return result
+
+    # -------------------------------------------------------------------------
+    # Audio and Text-to-Speech Helpers
+    # -------------------------------------------------------------------------
+
+    def generate_speech(
+        self,
+        text: str,
+        filename: str = "speech.wav",
+        provider: str = "edge",
+        **kwargs
+    ) -> Optional[str]:
+        """
+        Generate speech audio from text using TTS.
+
+        Args:
+            text: Text to convert to speech.
+            filename: Output filename.
+            provider: "edge" (recommended) or "google".
+            **kwargs: Provider-specific options (voice, language, rate).
+
+        Returns:
+            Local path to generated audio file.
+
+        Usage:
+            # Generate with Edge TTS (default, better quality)
+            audio = self.generate_speech("Welcome to the adventure")
+            
+            # Generate with specific voice
+            audio = self.generate_speech(
+                "Let's create a story",
+                voice="en-US-GuyNeural"  # Male voice
+            )
+            
+            # Generate with Google TTS
+            audio = self.generate_speech(
+                "Hello world",
+                provider="google"
+            )
+        """
+        logger.info(f"Generating speech: '{text[:50]}...'")
+        return self.tts.convert(text, filename, provider, **kwargs)
+
+    def play_speech(
+        self,
+        text: Optional[str] = None,
+        audio_file: Optional[str] = None,
+        wait_seconds: float = 5.0,
+        provider: str = "edge",
+    ) -> bool:
+        """
+        Generate speech and play it on device (or play existing audio).
+
+        Args:
+            text: Text to generate speech from (if audio_file not provided).
+            audio_file: Path to existing audio file (skip TTS).
+            wait_seconds: How long to wait for audio playback.
+            provider: TTS provider ("edge" or "google").
+
+        Returns:
+            True if audio was played successfully.
+
+        Usage:
+            # Convert text to speech and play
+            self.play_speech("Start creating your story")
+            
+            # Play existing audio file
+            self.play_speech(audio_file="audio/intro.wav")
+        """
+        audio_path = audio_file
+
+        # Generate audio from text if not provided
+        if not audio_path:
+            if not text:
+                logger.error("Either text or audio_file must be provided")
+                return False
+            audio_path = self.generate_speech(text, provider=provider)
+
+        if not audio_path:
+            logger.warning("No audio file to play")
+            return False
+
+        # We play audio LOCALLY on the host PC instead of on Miko.
+        # Edge TTS generates MP3 files. We use a headless VBScript with WMPlayer 
+        # to cleanly play it without popping up any UI windows.
+        try:
+            import os
+            import subprocess
+            import time
+            
+            audio_path = os.path.abspath(audio_path)
+            logger.info(f"🔊 Playing audio locally on HOST PC to Miko: {audio_path}")
+            
+            vbs_script = f'''
+Set wmp = CreateObject("WMPlayer.OCX")
+wmp.URL = "{audio_path}"
+wmp.controls.play
+WScript.Sleep 500
+While wmp.playState = 3
+    WScript.Sleep 100
+Wend
+'''
+            vbs_path = os.path.join(os.path.dirname(audio_path), "temp_play.vbs")
+            with open(vbs_path, "w") as f:
+                f.write(vbs_script)
+                
+            # Play the audio using cscript (blocks until playback finishes)
+            subprocess.call(["cscript", "//nologo", vbs_path])
+            
+            # Cleanup
+            if os.path.exists(vbs_path):
+                os.remove(vbs_path)
+                
+            # Wait additional buffer if requested
+            if wait_seconds > 0:
+                time.sleep(wait_seconds)
+                
+            return True
+        except Exception as e:
+            logger.error(f"Failed to play audio locally via VBS: {e}")
+            return False
+
+    def play_audio_file(self, audio_path: str, wait_seconds: float = 5.0) -> bool:
+        """
+        Play an existing audio file on device.
+
+        Args:
+            audio_path: Local path to audio file.
+            wait_seconds: How long to wait for playback.
+
+        Returns:
+            True if successful.
+
+        Usage:
+            self.play_audio_file("audio/adventure_intro.wav", wait_seconds=3)
+        """
+        return self.play_speech(audio_file=audio_path, wait_seconds=wait_seconds)
+
+    def record_device_audio(
+        self, output_filename: str = "recording.wav", duration_seconds: int = 5
+    ) -> Optional[str]:
+        """
+        Record audio from device microphone.
+
+        Args:
+            output_filename: Name for the recording.
+            duration_seconds: How long to record.
+
+        Returns:
+            Device path to recording if successful.
+
+        Usage:
+            device_path = self.record_device_audio(duration_seconds=3)
+        """
+        logger.info(f"Recording audio for {duration_seconds}s")
+        return self.audio.record_audio(output_filename, duration_seconds)
+
+    def batch_generate_speech(self, texts: dict, provider: str = "edge") -> dict:
+        """
+        Generate speech audio for multiple texts at once.
+
+        Args:
+            texts: Dict of {name: text} pairs.
+            provider: TTS provider to use.
+
+        Returns:
+            Dict of {name: audio_path}.
+
+        Usage:
+            audio_files = self.batch_generate_speech({
+                "greeting": "Welcome to the adventure",
+                "start": "Tap the button to begin",
+                "complete": "Great job! Story created!"
+            })
+            # audio_files = {
+            #   "greeting": "audio/greeting.wav",
+            #   "start": "audio/start.wav",
+            #   "complete": "audio/complete.wav"
+            # }
+        """
+        logger.info(f"Batch generating {len(texts)} audio files")
+        return self.tts.batch_convert(texts, provider)
+
     # -------------------------------------------------------------------------
     # Lifecycle Methods
     # -------------------------------------------------------------------------
@@ -456,71 +681,80 @@ class BaseTalentTest(ABC):
         self.wait(2, "Waiting for Home screen")
         self.pass_step()
 
-        # Step 1: Open Apps drawer - try multiple text variations
-        self.step("Open Apps Drawer", "Tapping Apps button")
-
-        # Debug: dump UI to see what's available
-        logger.info("Dumping UI hierarchy to find Apps button...")
-        ui_elements = self.find_text("App")
-        if ui_elements:
-            logger.info(f"Found elements with 'App': {len(ui_elements)}")
-            for elem in ui_elements[:3]:
-                logger.info(f"  - {elem}")
-
-        # Try multiple variations of Apps button text
-        apps_tap_success = False
-        for apps_text in ["Apps", "App", "applications"]:
-            if self.tap_text(apps_text):
-                logger.info(f"Found and tapped '{apps_text}' button")
-                apps_tap_success = True
+        # Get launch configuration early to determine navigation strategy
+        talent_cfg = self.config.get("talents", {})
+        launch_config = {}
+        for key, cfg in talent_cfg.items():
+            if cfg.get("package", "").lower() == self.package_name.lower():
+                launch_config = cfg
                 break
+        
+        launch_method = launch_config.get("launch_method", "am_start")
 
-        if not apps_tap_success:
-            # Last resort: try swiping up to open apps drawer
-            logger.warning("Could not find Apps button, trying swipe gesture")
-            self.adb.swipe(640, 700, 640, 200, 500)
-            self.wait(2, "Waiting for Apps drawer")
+        # Step 1: Open Apps drawer
+        self.step("Open Apps Drawer", "Ensuring apps drawer is visible")
+        
+        # If click-based with pre-clicks, perform them now to satisfy the mandatory "Apps" step
+        if launch_method == "click" and launch_config.get("pre_clicks"):
+            logger.info("Using coordinate-based navigation for Apps drawer")
+            pre_clicks = launch_config["pre_clicks"]
+            for idx, (x, y) in enumerate(pre_clicks, 1):
+                logger.info("  Tapping pre-click %d: (%d, %d)", idx, x, y)
+                self.adb.tap(x, y)
+                self.wait(1)
+            self.pass_step("Apps drawer opened via coordinates")
+        else:
+            # Try multiple variations of Apps button text
+            apps_tap_success = False
+            for apps_text in ["Apps", "App", "applications"]:
+                if self.tap_text(apps_text):
+                    logger.info(f"Found and tapped '{apps_text}' button")
+                    apps_tap_success = True
+                    break
 
-            # Check again if Apps drawer is open
-            if self.find_text("Search") or self.find_text("Apps"):
-                apps_tap_success = True
+            if not apps_tap_success:
+                # Last resort: try swiping up to open apps drawer
+                logger.warning("Could not find Apps button, trying swipe gesture")
+                self.adb.swipe(640, 700, 640, 200, 500)
+                self.wait(2, "Waiting for Apps drawer")
 
-        if not apps_tap_success:
-            self.fail_step("Cannot find Apps button")
-            return
+                # Check again if Apps drawer is open
+                if self.find_text("Search") or self.find_text("Apps"):
+                    apps_tap_success = True
 
-        self.wait(3, "Waiting for Apps drawer")
-        self.pass_step()
+            if not apps_tap_success:
+                self.fail_step("Cannot find Apps button")
+                return
 
-        # Step 2: Determine which tab based on talent category
-        self.step("Navigate to talent category", "Determining appropriate tab")
+            self.wait(3, "Waiting for Apps drawer")
+            self.pass_step()
 
-        # Map talent to category tab based on package name
-        talent_category = self._get_talent_category(self.package_name)
+            # Step 2: Navigate to category tab (Skip if using click-based launching)
+            self.step("Navigate to talent category", "Switching to appropriate category")
+            
+            talent_category = self._get_talent_category(self.package_name)
+            category_tap_success = False
+            category_options = {
+                "Video": ["Video", "Videos"],
+                "Stories": ["Stories", "Story", "Kids"],
+                "Games": ["Games", "Game", "Play"],
+            }
 
-        # Try multiple variations for category tabs
-        category_tap_success = False
-        category_options = {
-            "Video": ["Video", "Videos"],
-            "Stories": ["Stories", "Story", "Kids"],
-            "Games": ["Games", "Game", "Play"],
-        }
+            options = category_options.get(talent_category, [talent_category])
 
-        options = category_options.get(talent_category, [talent_category])
+            for category_text in options:
+                if self.tap_text(category_text):
+                    logger.info(f"Found and tapped '{category_text}' tab")
+                    category_tap_success = True
+                    break
 
-        for category_text in options:
-            if self.tap_text(category_text):
-                logger.info(f"Found and tapped '{category_text}' tab")
-                category_tap_success = True
-                break
+            if not category_tap_success:
+                logger.warning(
+                    f"Could not find {talent_category} tab, proceeding anyway"
+                )
 
-        if not category_tap_success:
-            logger.warning(
-                f"Could not find {talent_category} tab, proceeding with direct launch"
-            )
-
-        self.wait(2, "Waiting for category tab to load")
-        self.pass_step()
+            self.wait(2, "Waiting for category tab to load")
+            self.pass_step()
 
         # --- Launch Talent via Package Name ---
         self.step("Force stop talent", "Clean state before test")
@@ -528,11 +762,89 @@ class BaseTalentTest(ABC):
         self.wait(1, "Waiting after force stop")
         self.pass_step()
 
-        self.step("Launch talent", f"Starting {self.package_name} via am start")
-        success = self.discovery.launch_talent(self.package_name, self.activity_name)
+        # Get intent extras from config if available
+        intent_extras = None
+        talent_cfg = self.config.get("talents", {})
+        for key, cfg in talent_cfg.items():
+            if cfg.get("package", "").lower() == self.package_name.lower():
+                intent_extras = cfg.get("intent_extras")
+                break
+
+        self.step("Launch talent", f"Starting {self.package_name}")
+        
+        # Check if we should use click-based or search-based launching instead
+        talent_cfg = self.config.get("talents", {})
+        launch_config = {}
+        for key, cfg in talent_cfg.items():
+            if cfg.get("package", "").lower() == self.package_name.lower():
+                launch_config = cfg
+                break
+        
+        launch_method = launch_config.get("launch_method", "am_start")
+        
+        if launch_method == "search" and launch_config.get("search_enabled"):
+            # Use search-based launching: Apps >> Search >> Type >> Click Result
+            search_cfg = launch_config.get("search_config", {})
+            apps_button = search_cfg.get("apps_button_coordinates")
+            search_icon = search_cfg.get("search_icon_coordinates")
+            search_text = search_cfg.get("search_text")
+            search_result = search_cfg.get("search_result_coordinates")
+            
+            if apps_button and search_icon and search_text:
+                if isinstance(apps_button, (list, tuple)) and len(apps_button) == 2 and \
+                   isinstance(search_icon, (list, tuple)) and len(search_icon) == 2:
+                    logger.info(f"Using search-based launching: Apps >> Search >> '{search_text}'")
+                    success = self.discovery.launch_talent_via_search(
+                        self.package_name,
+                        tuple(apps_button),
+                        tuple(search_icon),
+                        search_text,
+                        search_result_coords=tuple(search_result) if search_result and isinstance(search_result, (list, tuple)) and len(search_result) == 2 else None,
+                        wait_before_apps=0.5,
+                        wait_after_apps=1.5,
+                        wait_after_type=1.5,
+                        wait_after_click=2.0,
+                    )
+                else:
+                    logger.warning(f"Invalid search coordinates, falling back to am_start")
+                    success = self.discovery.launch_talent(
+                        self.package_name, self.activity_name, extras=intent_extras
+                    )
+            else:
+                logger.warning(f"Missing search_config parameters, falling back to am_start")
+                success = self.discovery.launch_talent(
+                    self.package_name, self.activity_name, extras=intent_extras
+                )
+        elif launch_method == "click" and launch_config.get("app_icon_coordinates"):
+            # Use click-based launching
+            icon_coords = launch_config["app_icon_coordinates"]
+            if isinstance(icon_coords, (list, tuple)) and len(icon_coords) == 2:
+                logger.info(f"Using click-based launching at {icon_coords}")
+                success = self.discovery.launch_talent_by_click(
+                    self.package_name,
+                    tuple(icon_coords),
+                    wait_before=1.0,
+                    wait_after=2.0,
+                    pre_clicks=None, # Already handled in setup Phase 1
+                )
+            else:
+                logger.warning(f"Invalid app_icon_coordinates: {icon_coords}, falling back to am_start")
+                success = self.discovery.launch_talent(
+                    self.package_name, self.activity_name, extras=intent_extras
+                )
+        else:
+            # Use am start (default)
+            logger.info("Using default am_start launching")
+            success = self.discovery.launch_talent(
+                self.package_name, self.activity_name, extras=intent_extras
+            )
         if not success:
             self.fail_step(f"Failed to launch {self.package_name}")
             raise ADBError(f"Could not launch talent: {self.package_name}")
+
+        if intent_extras:
+            logger.info(f"Launched with extras: {intent_extras}")
+
         self.wait(2, "Waiting for talent to fully load")
         self.take_screenshot("after_launch")
 

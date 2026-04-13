@@ -342,6 +342,88 @@ class HTMLReportGenerator:
 
         .chevron {{ transition: transform 0.3s; }}
         .section.open .chevron {{ transform: rotate(90deg); }}
+
+        /* Pie Chart Dashboard */
+        .dashboard-row {{
+            display: flex;
+            gap: 24px;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+        }}
+        .dashboard-card {{
+            flex: 1;
+            min-width: 300px;
+            background: #1e293b;
+            border-radius: 12px;
+            padding: 24px;
+            border: 1px solid #334155;
+        }}
+        .pie-container {{
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 32px;
+        }}
+        .pie-chart {{
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            background: conic-gradient(
+                #10b981 0% var(--pass-p), 
+                #ef4444 var(--pass-p) var(--fail-p), 
+                #f59e0b var(--fail-p) 100%
+            );
+            position: relative;
+        }}
+        .pie-chart::after {{
+            content: "";
+            position: absolute;
+            inset: 30px;
+            background: #1e293b;
+            border-radius: 50%;
+        }}
+        .pie-legend {{ list-style: none; }}
+        .pie-legend li {{
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }}
+        .dot {{ width: 12px; height: 12px; border-radius: 3px; }}
+
+        /* Executive Summary */
+        .exec-summary {{
+            font-size: 16px;
+            color: #cbd5e1;
+            padding: 24px;
+            background: #1e293b;
+            border-radius: 12px;
+            margin-bottom: 24px;
+            border-left: 4px solid #60a5fa;
+            border-top: 1px solid #334155;
+            border-right: 1px solid #334155;
+            border-bottom: 1px solid #334155;
+        }}
+        .exec-summary h2 {{ color: #60a5fa; margin-bottom: 12px; font-size: 20px; }}
+        .exec-summary p {{ margin-bottom: 12px; }}
+
+        /* Action Items */
+        .action-card {{
+            background: #450a0a;
+            border: 1px solid #ef4444;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 24px;
+        }}
+        .action-card h3 {{ color: #f87171; margin-bottom: 12px; }}
+        .action-list {{ list-style: none; }}
+        .action-list li {{
+            padding: 8px 0;
+            border-bottom: 1px solid #7f1d1d;
+            font-size: 14px;
+        }}
+        .action-list li:last-child {{ border-bottom: none; }}
     </style>
 </head>
 <body>
@@ -356,29 +438,32 @@ class HTMLReportGenerator:
             </div>
         </div>
 
-        <!-- Summary Cards -->
-        <div class="summary-grid">
-            <div class="card total">
-                <div class="label">Total Tests</div>
-                <div class="value">{total}</div>
+        <!-- Dashboard -->
+        <div class="dashboard-row" style="--pass-p: {(passed/max(total,1))*360:.0f}deg; --fail-p: {((passed+failed)/max(total,1))*360:.0f}deg;">
+            <div class="dashboard-card">
+                <div class="pie-container">
+                    <div class="pie-chart"></div>
+                    <ul class="pie-legend">
+                        <li><span class="dot" style="background:#10b981;"></span> Passed ({(passed/max(total,1))*100:.0f}%)</li>
+                        <li><span class="dot" style="background:#ef4444;"></span> Failed ({(failed/max(total,1))*100:.0f}%)</li>
+                        <li><span class="dot" style="background:#f59e0b;"></span> Errors ({(errors/max(total,1))*100:.0f}%)</li>
+                    </ul>
+                </div>
             </div>
-            <div class="card pass">
-                <div class="label">Passed</div>
-                <div class="value">{passed}</div>
-            </div>
-            <div class="card fail">
-                <div class="label">Failed</div>
-                <div class="value">{failed}</div>
-            </div>
-            <div class="card error">
-                <div class="label">Errors</div>
-                <div class="value">{errors}</div>
-            </div>
-            <div class="card time">
-                <div class="label">Total Duration</div>
-                <div class="value">{duration:.1f}s</div>
+            <div class="dashboard-card" style="flex: 2;">
+                <div class="exec-summary">
+                    <h2>📝 Executive Summary</h2>
+                    <p>{self._get_summary_description(total, passed, failed, errors)}</p>
+                    <div class="meta">
+                        <strong>Environment:</strong> {self.device_info.get('model', 'Unknown Miko')} | 
+                        <strong>Success Rate:</strong> {(passed/max(total,1))*100:.1f}%
+                    </div>
+                </div>
             </div>
         </div>
+
+        <!-- Action Items -->
+        {self._build_action_items(failed, errors)}
 
         <!-- Progress Bar -->
         <div class="progress-bar">
@@ -564,4 +649,51 @@ class HTMLReportGenerator:
                     Formula: Score = (Reach × Impact × Confidence) / Effort — Higher is better
                 </p>
             </div>
+        </div>"""
+
+    def _get_summary_description(self, total, passed, failed, errors) -> str:
+        """Generate a human-readable summary description of the test run."""
+        if total == 0:
+            return "No tests were executed in this session."
+
+        rate = (passed / total) * 100
+        if rate == 100:
+            status = "The automation run was perfect! All talents are performing as expected with 100% success rate."
+        elif rate >= 80:
+            status = f"The automation run was largely successful with a {rate:.1f}% success rate. Most talents are stable, but some issues were detected."
+        elif rate >= 50:
+            status = f"The automation run had mixed results with a {rate:.1f}% success rate. Several talents require attention and debugging."
+        else:
+            status = f"The automation run detected significant issues with only a {rate:.1f}% success rate. Immediate investigation into the failures is recommended."
+
+        details = []
+        if failed > 0:
+            details.append(f"{failed} talent(s) failed their specific test steps")
+        if errors > 0:
+            details.append(f"{errors} talent(s) encountered technical errors or crashes")
+
+        if details:
+            status += " Specifically, " + " and ".join(details) + "."
+
+        return status
+
+    def _build_action_items(self, failed, errors) -> str:
+        """Build the action items section if there are failures."""
+        if failed == 0 and errors == 0:
+            return ""
+
+        items = ""
+        for result in self.results:
+            if result.status.value in ["FAILED", "ERROR"]:
+                icon = "❌" if result.status.value == "FAILED" else "⚠️"
+                msg = result.error_message or "Step failure"
+                items += f"<li><strong>{icon} {result.talent_name}</strong>: {msg}</li>"
+
+        return f"""
+        <div class="action-card">
+            <h3>🚩 Action Required</h3>
+            <p>The following items requires your attention for debugging and resolution:</p>
+            <ul class="action-list">
+                {items}
+            </ul>
         </div>"""

@@ -35,7 +35,7 @@ class VooksTalentTest(BaseTalentTest):
             config=config,
             talent_name=talent_cfg.get("display_name", "Vooks"),
             package_name=talent_cfg.get("package", "com.miko.vooks"),
-            activity_name=talent_cfg.get("activity", ".MainActivity"),
+            activity_name=talent_cfg.get("activity", ".game.view.activity.GameActivity"),
             **kwargs,
         )
         self.talent_cfg = talent_cfg

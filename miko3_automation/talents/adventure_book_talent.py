@@ -21,7 +21,7 @@ class AdventureBookTalentTest(BaseTalentTest):
             adb=adb,
             config=config,
             talent_name=talent_cfg.get("display_name", "Adventure Book"),
-            package_name=talent_cfg.get("package", "com.miko.adventurebook"),
+            package_name=talent_cfg.get("package", "com.miko.story_maker"),
             activity_name=talent_cfg.get("activity", ".MainActivity"),
             **kwargs,
         )

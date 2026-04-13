@@ -8,7 +8,7 @@
 #   chmod +x scripts/run_all_tests.sh
 #   scripts/run_all_tests.sh
 #   scripts/run_all_tests.sh --verbose
-#   scripts/run_all_tests.sh --talent video
+#   scripts/run_all_tests.sh --talent mikoji
 # ============================================================================
 
 set -e

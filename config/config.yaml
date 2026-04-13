@@ -16,16 +16,29 @@ device:
 # --- Screen Properties ---
 screen:
   width: 1280                       # Miko3 screen width in pixels
-  height: 800                       # Miko3 screen height in pixels
-  density: 213                      # Screen density (dpi)
+  height: 720                       # Miko3 screen height in pixels
+  density: 160                      # Screen density (dpi)
 
 # --- Talent Package Mappings ---
 # Update these with actual Miko3 package names discovered via `adb shell pm list packages | grep miko`
 talents:
-  video:
+  mikoji:
     package: "com.miko.mikoji"
     activity: ".MainActivity"
-    display_name: "Video Talent"
+    display_name: "Mikojis Talent"
+    launch_method: "click"                # Options: "am_start" (default), "click", or "search"
+    app_icon_coordinates: [1207, 644]     # For "click" method: [x, y] coordinates of app icon
+    search_enabled: true                  # For "search" method: enable search-based launching
+    search_config:                        # For "search" method: configuration
+      apps_button_coordinates: [1207, 644]   # [x, y] - coordinates of "Apps" button on home screen
+      search_icon_coordinates: [1228, 53] # [x, y] - coordinates of search icon inside apps drawer
+      click_on_search_icon: [444, 64]     # [x, y] - coordinates of click on search icon field to enter details
+      search_text: "Mikojis"
+      press_enter_to_close_keyboard : [1207, 665]             # Text to search for in search bar
+      click_on_talent_icon: [238, 365]     # [x, y] - coordinates of talent icon to click (auto-detect if null)
+    intent_extras:
+      APP_ID: "11"
+      INTENT: "play_video"
     coordinates:
       play_button: [640, 400]
       next_button: [1100, 750]
@@ -45,30 +58,99 @@ talents:
         - "video"
         - "play"
         - "thumbnail"
+    recovery:
+      enabled: true
+      max_retries: 2                 # Max recovery attempts before giving up
+      popup_keywords:                # Keywords to detect error popups
+        - "error"
+        - "failed"
+        - "retry"
+        - "ok"
+        - "cancel"
+        - "close"
+      check_interval: 2              # Seconds between popup checks during playback
 
   storymaker:
     package: "com.miko.story_maker"
     activity: ".MainActivity"
     display_name: "Storymaker"
+    launch_method: "click"
+    app_icon_coordinates: [933, 212]     # Storymaker talent icon
+    pre_clicks: [[1207, 644]]             # Click Apps button first
+    search_enabled: false
+    search_config:
+      apps_button_coordinates: [1207, 644]
+      search_icon_coordinates: null
+      search_text: "Storymaker"
+      search_result_coordinates: null
+      search_result_coordinates: [238, 365]        # [x, y] - coordinates of app result to click (auto-detect if null)
+    intent_extras:
+      APP_ID: "121"
+      INTENT: "create_story"
     coordinates:
-      disclaimer_cross: [1150, 80]
-      start_button: [640, 500]
-      create_story: [640, 600]
-      no_button: [400, 600]
-      yes_button: [800, 600]
-      next_step: [1100, 750]
-      finish_button: [640, 700]
+      ai_disclaimer_cross: [154, 120]
+      create_story: [186, 591]
+      click_on_exit_button: [71, 73]
+      no_button: [892, 620]
+      yes_button: [1114, 630]
+      exit_button_to_root_screen: [55, 77]
+      # New coordinates for tabs and viewer
+      story_book_tab: [476, 77]
+      my_adventure_tab: [663, 67]
+      like_icon: [1114, 630]        # "Yes" button in Viewer
+      dislike_icon: [892, 620]     # "No" button in Viewer
+      new_first_story_card: [300, 400] # New User First story in list
+      existing_first_story_card: [590, 370] # Existing User First story in list
+
     timings:
       load_wait: 10
       animation_wait: 3
       step_delay: 2
       conversation_wait: 15
       num_questions: 6
+      # New timings for storybook review
+      page_audio_wait: 12
+      min_pages: 5
+      max_pages: 7
+    scenario: "new_user" # Options: "new_user", "existing_user"
+    response_phrases:
+      - "A brave knight named Sir Lancelot"
+      - "In a deep, magical forest"
+      - "A fire-breathing but friendly dragon"
+      - "Searching for the lost golden crown"
+      - "They all shared a big feast"
+      - "And they lived happily ever after"
+    conversation:
+      intro_max_wait: 45
+      listening_poll_interval: 3
+      listening_max_wait: 30
+      story_build_max_wait: 60
+      initial_response: "Yes"
+      topic_sentences:
+        - "A story about a cricket match"
+        - "A magical doll that can talk"
+        - "A friendly robot who helps everyone"
+        - "A toy car that can fly"
+        - "A brave knight in a castle"
+        - "A dragon who loves to paint"
+      num_rounds: 6
+      final_feedback: "Yes I like this story"
 
   vooks:
     package: "com.miko.vooks"
-    activity: ""
+    activity: ".game.view.activity.GameActivity"
     display_name: "Vooks"
+    launch_method: "click"            # Options: "click" (default)
+    app_icon_coordinates: null        # For "click" method: [x, y] coordinates of app icon
+    search_enabled: false             # For "search" method: enable search-based launching
+    search_config:                    # For "search" method: configuration
+      apps_button_coordinates: null   # [x, y] - coordinates of "Apps" button on home screen
+      search_icon_coordinates: null   # [x, y] - coordinates of search icon inside apps drawer
+      search_text: "Vooks"            # Text to search for in search bar
+      search_result_coordinates: null # [x, y] - coordinates of app result to click (auto-detect if null)
+    intent_extras:
+      APP_ID: "104"
+      INTENT: "play_story"
     coordinates:
       story_list_first: [300, 400]    # First thumbnail position
       play_button: [640, 400]         # Center play/pause toggle
@@ -82,9 +164,20 @@ talents:
       session_timeout: 120
 
   adventure_book:
-    package: "com.miko.adventurebook"
+    package: "com.miko.story_maker"
     activity: ".MainActivity"
     display_name: "My Adventure Book"
+    launch_method: "click"                  # Options: "click" (default)
+    app_icon_coordinates: [933, 212]        # For "click" method: [x, y] coordinates of app icon
+    search_enabled: false                   # For "search" method: enable search-based launching
+    search_config:                          # For "search" method: configuration
+      apps_button_coordinates: [1207, 644]  # [x, y] - coordinates of "Apps" button on home screen
+      search_icon_coordinates: null         # [x, y] - coordinates of search icon inside apps drawer
+      search_text: "Adventure Book"         # Text to search for in search bar
+      search_result_coordinates: null       # [x, y] - coordinates of app result to click (auto-detect if null)
+    intent_extras:
+      APP_ID: "130"
+      INTENT: "read_book"
     coordinates:
       story_list_first: [640, 200]
       page_next: [1100, 400]
@@ -123,7 +216,7 @@ reporting:
 # --- RICE POT Default Scores ---
 # Scores: 1-10 scale (Effort is inverted: higher = less effort = better)
 rice_pot:
-  video:
+  mikoji:
     reach: 9
     impact: 8
     confidence: 7
@@ -146,6 +239,6 @@ rice_pot:
 
 # --- Logging ---
 logging:
-  level: "INFO"                     # DEBUG, INFO, WARNING, ERROR
+  level: "INFO"                      # DEBUG, INFO, WARNING, ERROR
   log_file: "reports/automation.log"
   console_output: true

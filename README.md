@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # 🤖 Miko3 Talents Automation Framework
 
 > **Full ADB + Python Automation Framework** for testing Miko3 Reboot's talents with built-in verification, HTML reporting, and RICE POT prioritization.
@@ -31,7 +30,7 @@ This framework automates testing of Miko3 Reboot's talents (apps) using ADB. It 
 
 | Feature | Description |
 |---------|-------------|
-| 🎮 **Talent Testing** | Automated tests for Video, Storymaker, Storytelling, and third-party talents |
+| 🎮 **Talent Testing** | Automated tests for Mikoji, Storymaker, Storytelling, and third-party talents |
 | ✅ **Verification** | Screenshot diff, crash detection, activity assertions, logcat analysis |
 | 📊 **HTML Reports** | Professional dark-themed reports with screenshots, pass/fail badges, and RICE analysis |
 | 📈 **RICE POT** | Data-driven prioritization for which talents to automate first |
@@ -50,8 +49,9 @@ miko3_automation/
 │   └── talent_discovery.py  #   Package/activity discovery, intent management
 ├── talents/                 # Test Layer
 │   ├── base_talent.py       #   Abstract base: setup → execute → verify → teardown
-│   ├── video_talent.py      #   Video playlist automation
-│   ├── storymaker_talent.py #   Story creation flow automation
+│   ├── mikoji_talent.py      #   Mikoji video playlist automation
+│   ├── storymaker_new_user_flow.py #   New user story creation flow
+│   ├── storymaker_existing_user_flow.py # Existing user story review flow
 │   ├── storytelling_talent.py #  Session playback automation
 │   └── thirdparty_talent.py #   Generic smoke testing for any app
 ├── verification/            # Assertion Layer
@@ -144,7 +144,7 @@ adb devices
 python runner.py --all
 
 # Run specific talent
-python runner.py --talent video
+python runner.py --talent mikoji
 
 # Discover installed talents
 python runner.py --discover
@@ -179,8 +179,8 @@ device:
 
 ```yaml
 talents:
-  video:
-    package: "com.miko.video"         # ← Update with actual package name
+  mikoji:
+    package: "com.miko.mikoji"         # ← Update with actual package name
     activity: ".MainActivity"          # ← Update with actual activity
     coordinates:
       play_button: [640, 400]          # ← Calibrate to your screen
@@ -216,8 +216,8 @@ adb shell "dumpsys window windows | grep mFocusedApp"
 adb shell dumpsys window windows | grep mFocusedApp
 
 # Find main activity
-adb shell dumpsys package com.miko.video | findstr "Activity"     # Windows
-adb shell dumpsys package com.miko.video | grep "Activity"        # Linux
+adb shell dumpsys package com.miko.mikoji | findstr "Activity"     # Windows
+adb shell dumpsys package com.miko.mikoji | grep "Activity"        # Linux
 ```
 
 ---
@@ -231,7 +231,7 @@ python runner.py [OPTIONS]
 
 Actions:
   --all                      Run all talent tests
-  --talent TALENT            Run specific talent: video|storymaker|storytelling|thirdparty
+  --talent TALENT            Run specific talent: mikoji|storymaker|storymaker_existing|vooks|video|storytelling|thirdparty|adventure_book
   --discover                 List all installed talents on device
   --rice                     Show RICE POT prioritization analysis
 
@@ -241,6 +241,9 @@ Options:
   --config PATH              Custom config file (default: config/config.yaml)
   --report-dir DIR           Custom report output directory
   --verbose, -v              Enable debug logging
+  --resume                   Resume from last checkpoint if interrupted
+  --clear-checkpoints        Clear all saved checkpoints before running
+  --repeat NUMBER            Number of times to loop the execution
 ```
 
 ### Examples
@@ -249,14 +252,14 @@ Options:
 # Test all built-in talents
 python runner.py --all
 
-# Test only video talent
-python runner.py --talent video
+# Test only mikoji talent
+python runner.py --talent mikoji
 
 # Test a specific third-party talent
 python runner.py --talent thirdparty --package com.example.myapp
 
 # Test multiple specific talents
-python runner.py --talent video --talent storytelling
+python runner.py --talent mikoji --talent storytelling
 
 # Target a specific device (for multi-device setups)
 python runner.py --all --device 192.168.1.100:5555
@@ -278,25 +281,25 @@ scripts\run_all_tests.bat
 scripts/run_all_tests.sh
 
 # Pass arguments through scripts
-scripts\run_all_tests.bat --talent video --verbose    # Windows
-scripts/run_all_tests.sh --talent video --verbose     # Linux
+scripts\run_all_tests.bat --talent mikoji --verbose    # Windows
+scripts/run_all_tests.sh --talent mikoji --verbose     # Linux
 ```
 
 ---
 
 ## Talent Automation Details
 
-### Video Talent
+### Mikoji Talent
 
 **Test Flow:**
-1. Launch video talent via `am start`
+1. Launch mikoji talent via `am start`
 2. For each video (configurable count):
    - Tap play button → Wait for video → Tap next
 3. Verify: videos played, no crashes, screen changed
 
 ```bash
 # ADB commands used internally:
-adb shell am start -n com.miko.video/.MainActivity       # Launch
+adb shell am start -n com.miko.mikoji/.MainActivity       # Launch
 adb shell input tap 640 400                                # Play
 adb shell input tap 1100 750                               # Next
 adb shell screencap -p /sdcard/screenshot.png              # Evidence
@@ -360,7 +363,7 @@ The framework uses **RICE** scoring to prioritize automation efforts:
 
 | Talent | R | I | C | E | Score | Priority |
 |--------|---|---|---|---|-------|----------|
-| Video | 9 | 8 | 7 | 5 | 100.8 | 🔴 CRITICAL |
+| Mikoji | 9 | 8 | 7 | 5 | 100.8 | 🔴 CRITICAL |
 | Storytelling | 8 | 8 | 7 | 6 | 74.7 | 🟠 HIGH |
 | Storymaker | 7 | 7 | 6 | 4 | 73.5 | 🟠 HIGH |
 | Third-Party | 5 | 6 | 4 | 3 | 40.0 | 🟡 MEDIUM |
@@ -475,7 +478,7 @@ talents:
 from miko3_automation.talents.my_new_talent import MyNewTalentTest
 
 talent_map = {
-    "video": VideoTalentTest,
+    "mikoji": MikojiTalentTest,
     "mynew": MyNewTalentTest,  # Add this line
     # ...
 }
@@ -535,7 +538,4 @@ Miko3 Talents Automation/
 ## License
 
 Internal use — Miko3 QA Automation Team.
-=======
-# Miko3_talent_automation_code
-This repository consists of different talent automation code
->>>>>>> a4d01929d722450c13bafb1ace7fd70296dd0a92
+

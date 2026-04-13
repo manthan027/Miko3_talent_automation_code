@@ -9,7 +9,7 @@ Usage:
     python runner.py --all
 
     # Run specific talent
-    python runner.py --talent video
+    python runner.py --talent mikoji
     python runner.py --talent storymaker
     python runner.py --talent storytelling
     python runner.py --talent adventure_book
@@ -56,9 +56,11 @@ from miko3_automation.core.connection_monitor import (
 )
 from miko3_automation.core.checkpoint import CheckpointManager
 from miko3_automation.core.talent_discovery import TalentDiscovery
-from miko3_automation.talents.video_talent import VideoTalentTest
-from miko3_automation.talents.storymaker_talent import StorymakerTalentTest
+from miko3_automation.talents.mikoji_talent import MikojiTalentTest
+from miko3_automation.talents.storymaker_new_user_flow import StorymakerNewUserFlowTest
+from miko3_automation.talents.storymaker_existing_user_flow import StorymakerExistingUserFlowTest
 from miko3_automation.talents.vooks_talent import VooksTalentTest
+from miko3_automation.talents.storytelling_talent import StorytellingTalentTest
 from miko3_automation.talents.thirdparty_talent import ThirdPartyTalentTest
 from miko3_automation.talents.adventure_book_talent import AdventureBookTalentTest
 from miko3_automation.verification.verifier import Verifier
@@ -162,9 +164,10 @@ def cmd_rice(config: dict) -> None:
     # Show detailed justifications
     print("\n📋 DETAILED JUSTIFICATIONS:\n")
     for talent_key in [
-        "video",
+        "mikoji",
         "storymaker",
         "vooks",
+        "storytelling",
         "thirdparty",
         "adventure_book",
     ]:
@@ -197,9 +200,12 @@ def cmd_run_tests(
 
     # Map talent names to test classes
     talent_map = {
-        "video": VideoTalentTest,
-        "storymaker": StorymakerTalentTest,
+        "mikoji": MikojiTalentTest,
+        "storymaker": StorymakerNewUserFlowTest,
+        "storymaker_existing": StorymakerExistingUserFlowTest,
         "vooks": VooksTalentTest,
+        "video": VooksTalentTest,  # Alias for vooks
+        "storytelling": StorytellingTalentTest,
         "adventure_book": AdventureBookTalentTest,
     }
 
@@ -289,7 +295,10 @@ def cmd_run_tests(
         print("\n" + "═" * 50)
         print("📊 GENERATING REPORT...")
         report_path = report.generate()
-        print(f"✅ Report saved: {os.path.abspath(report_path)}")
+        abs_report_path = os.path.abspath(report_path)
+        print(f"\n✅ SUCCESS: Report generated and saved at:")
+        print(f"   file:///{abs_report_path.replace('\\', '/')}")
+        print("─" * 50)
 
         # Print summary
         total = len(results)
@@ -322,7 +331,16 @@ Examples:
     actions.add_argument("--all", action="store_true", help="Run all talent tests")
     actions.add_argument(
         "--talent",
-        choices=["video", "storymaker", "vooks", "thirdparty", "adventure_book"],
+        choices=[
+            "mikoji",
+            "storymaker",
+            "storymaker_existing",
+            "vooks",
+            "video",
+            "storytelling",
+            "thirdparty",
+            "adventure_book",
+        ],
         action="append",
         help="Run specific talent test (can be repeated)",
     )
@@ -358,6 +376,12 @@ Examples:
         "--clear-checkpoints",
         action="store_true",
         help="Clear all saved checkpoints before running",
+    )
+    options.add_argument(
+        "--repeat",
+        type=int,
+        default=1,
+        help="Number of times to loop the execution",
     )
 
     args = parser.parse_args()
@@ -396,9 +420,12 @@ Examples:
 
     # --- Connect to device ---
     try:
-        print("\n📱 Connecting to device...")
+        print("  - Initializing DeviceManager...")
         dm = DeviceManager(config)
+        print("  - Verifying connection...")
         adb = dm.get_device()
+        print(f"  - Device connected: {dm.serial}")
+        print("  - Preparing device (wake, unlock, home)...")
         dm.ensure_ready()
 
         info = dm.get_device_info()
@@ -434,16 +461,32 @@ Examples:
             print(f"  🗑️ Cleared {cleared} checkpoints")
 
         if args.all:
-            talents = ["video", "storymaker", "vooks", "adventure_book"]
+            talents = [
+                "mikoji",
+                "storymaker",
+                "vooks",
+                "storytelling",
+                "adventure_book",
+            ]
             if args.package:
                 talents.append("thirdparty")
         else:
             talents = args.talent
 
-        results = cmd_run_tests(adb, config, talents, args.package, args.resume, dm)
+        all_passed = True
+        for iteration in range(args.repeat):
+            if args.repeat > 1:
+                print(f"\n========================================")
+                print(f"🔄 ITERATION {iteration + 1}/{args.repeat}")
+                print(f"========================================")
+
+            results = cmd_run_tests(adb, config, talents, args.package, args.resume, dm)
+
+            if not results or not all(r.passed for r in results):
+                all_passed = False
 
         # Exit code based on results
-        if results and all(r.passed for r in results):
+        if all_passed:
             sys.exit(0)
         else:
             sys.exit(1)

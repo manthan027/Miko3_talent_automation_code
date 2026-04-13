@@ -1,0 +1,15 @@
+{
+  "test_name": "adventure_book",
+  "timestamp": "2026-04-02T20:58:49.010699",
+  "timestamp_unix": 1775143729.0107124,
+  "state": {
+    "current_step": 5,
+    "step_name": "Step 5: Force stop talent",
+    "package_name": "com.miko.adventurebook",
+    "activity_name": ".MainActivity"
+  },
+  "metadata": {
+    "step_count": 5,
+    "last_action": "Step 5: Force stop talent"
+  }
+}

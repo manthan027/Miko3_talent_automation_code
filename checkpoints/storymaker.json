@@ -1,15 +1,15 @@
 {
   "test_name": "storymaker",
-  "timestamp": "2026-04-02T18:28:46.418021",
-  "timestamp_unix": 1775134726.4180295,
+  "timestamp": "2026-04-11T20:25:38.737019",
+  "timestamp_unix": 1775919338.737043,
   "state": {
-    "current_step": 8,
-    "step_name": "Step 8: Dismiss disclaimer",
+    "current_step": 9,
+    "step_name": "Step 9: Create Story",
     "package_name": "com.miko.story_maker",
     "activity_name": ".MainActivity"
   },
   "metadata": {
-    "step_count": 8,
-    "last_action": "Step 8: Dismiss disclaimer"
+    "step_count": 9,
+    "last_action": "Step 9: Create Story"
   }
 }
