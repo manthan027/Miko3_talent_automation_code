@@ -142,16 +142,24 @@ class ADBClient:
                 logger.debug(
                     "ADB [attempt %d/%d]: %s", attempt, attempts, " ".join(cmd)
                 )
-                # No shell=True on Windows unless necessary; it can lead to hangs.
+                # On Windows, we must explicitly set encoding to UTF-8 and use errors="replace"
+                # to prevent UnicodeDecodeError when ADB output (like logs) contains non-ASCII characters.
                 result = subprocess.run(
                     cmd,
                     capture_output=True,
                     text=True,
+                    encoding="utf-8",
+                    errors="replace",
                     timeout=effective_timeout,
                     shell=False,
                 )
+                
+                # Robustly handle stdout/stderr even if subprocess returns unexpected None values
+                stdout_str = (result.stdout or "").strip()
+                stderr_str = (result.stderr or "").strip()
+
                 if result.returncode != 0:
-                    error_msg = result.stderr.strip() or result.stdout.strip()
+                    error_msg = stderr_str or stdout_str
                     if (
                         "no such device" in error_msg.lower()
                         or "device not found" in error_msg.lower()
@@ -159,9 +167,8 @@ class ADBClient:
                         raise ConnectionError(f"Device connection lost: {error_msg}")
                     raise ADBError(f"ADB command failed: {error_msg}")
 
-                output = result.stdout.strip()
-                logger.debug("ADB output: %s", output[:200])
-                return output
+                logger.debug("ADB output: %s", stdout_str[:200])
+                return stdout_str
 
             except subprocess.TimeoutExpired:
                 last_error = ConnectionError(
@@ -341,7 +348,7 @@ class ADBClient:
         Returns:
             Command output.
         """
-        sanitized = text.replace(" ", "%s").replace("&", "\\&").replace("<", "\\<")
+        sanitized = text.replace(" ", "%s").replace("&", "\\&").replace("<", "\\<").replace("'", "\\'")
         logger.info("Inputting text: %s", text[:50])
         return self._execute("shell", f"input text '{sanitized}'")
 
@@ -577,14 +584,36 @@ class ADBClient:
 
         # Battery
         try:
-            battery = self._execute(
-                "shell", "dumpsys battery | grep level", retry=False
-            )
-            props["battery_level"] = (
-                battery.split(":")[-1].strip() if ":" in battery else "unknown"
-            )
-        except ADBError:
+            # Ensure battery service is refreshing (not locked after manual override)
+            self.shell("dumpsys battery reset")
+            
+            # Fetch full status for more robust parsing
+            battery_info = self.shell("dumpsys battery")
+            level = "unknown"
+            status = "unknown"
+            
+            for line in battery_info.splitlines():
+                line = line.strip()
+                if line.startswith("level:"):
+                    level = line.split(":")[-1].strip()
+                elif line.startswith("status:"):
+                    # Convert numeric status to string if possible
+                    status_val = line.split(":")[-1].strip()
+                    status_map = {
+                        "1": "Unknown",
+                        "2": "Charging", 
+                        "3": "Discharging",
+                        "4": "Not Charging", 
+                        "5": "Full"
+                    }
+                    status = status_map.get(status_val, f"Code {status_val}")
+
+            props["battery_level"] = level
+            props["battery_status"] = status
+        except Exception as e:
+            logger.warning("Battery fetch failed: %s", e)
             props["battery_level"] = "unknown"
+            props["battery_status"] = "unknown"
 
         return props
 

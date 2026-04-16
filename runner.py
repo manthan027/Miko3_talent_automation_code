@@ -294,10 +294,15 @@ def cmd_run_tests(
     if results:
         print("\n" + "═" * 50)
         print("📊 GENERATING REPORT...")
-        report_path = report.generate()
-        abs_report_path = os.path.abspath(report_path)
-        print(f"\n✅ SUCCESS: Report generated and saved at:")
-        print(f"   file:///{abs_report_path.replace('\\', '/')}")
+        html_path, pdf_path = report.generate()
+        abs_html_path = os.path.abspath(html_path)
+        print(f"\n✅ SUCCESS: HTML Report generated and saved at:")
+        print(f"   file:///{abs_html_path.replace('\\', '/')}")
+        
+        if pdf_path:
+            abs_pdf_path = os.path.abspath(pdf_path)
+            print(f"✅ SUCCESS: PDF Report generated and saved at:")
+            print(f"   file:///{abs_pdf_path.replace('\\', '/')}")
         print("─" * 50)
 
         # Print summary

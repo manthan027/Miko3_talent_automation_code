@@ -51,6 +51,12 @@ class StorymakerNewUserFlowTest(BaseTalentTest):
             return
         self.pass_step()
 
+        # Talent Stabilization
+        self.step("Stabilization", "Waiting for Storymaker to load")
+        logger.info("Waiting 8 seconds for talent to stabilize...")
+        self.wait(8, "Stabilization wait")
+        self.pass_step()
+
         # Handle AI Disclaimer
         self.step("AI Disclaimer", "Handling initial disclaimer prompt")
         disc_coords = self.coords.get("ai_disclaimer_cross", [154, 120])
@@ -77,7 +83,9 @@ class StorymakerNewUserFlowTest(BaseTalentTest):
         logger.info("Waiting for intro to finish...")
         intro_max_wait = conv_cfg.get("intro_max_wait", 45)
         if not self._wait_for_listening_mode(max_wait=intro_max_wait):
-            logger.warning("Listening mode not detected after intro, proceeding anyway")
+            self.fail_step("Listening mode not detected after intro.")
+            logger.error("Execution aborted: Listening mode failed.")
+            return
             
         # Initial Response ("Yes")
         initial_resp = conv_cfg.get("initial_response", "Yes")
@@ -92,7 +100,9 @@ class StorymakerNewUserFlowTest(BaseTalentTest):
             # Wait for bot to ask question and enter listening mode
             listening_max_wait = conv_cfg.get("listening_max_wait", 30)
             if not self._wait_for_listening_mode(max_wait=listening_max_wait):
-                logger.warning(f"Listening mode not detected for round {i+1}, proceeding anyway")
+                self.fail_step(f"Listening mode not detected for round {i+1}.")
+                logger.error("Execution aborted: Listening mode failed.")
+                return
             
             phrase = topics[i % len(topics)]
             self._play_and_wait_ack(phrase, step_name=f"conversation_step_{i+1}")
@@ -103,7 +113,10 @@ class StorymakerNewUserFlowTest(BaseTalentTest):
         self.step("Story Building", "Waiting for story to build")
         build_max_wait = conv_cfg.get("story_build_max_wait",60)
         logger.info(f"Waiting up to {build_max_wait}s for story to build...")
-        self._wait_for_listening_mode(max_wait=build_max_wait)
+        if not self._wait_for_listening_mode(max_wait=build_max_wait):
+            self.fail_step("Listening mode not detected after story building.")
+            logger.error("Execution aborted: Listening mode failed.")
+            return
         self.pass_step()
         
         # --- Final Feedback ---
@@ -111,6 +124,34 @@ class StorymakerNewUserFlowTest(BaseTalentTest):
         final_feedback = conv_cfg.get("final_feedback", "Yes I like this story")
         self._play_and_wait_ack(final_feedback, step_name="final_feedback", wait_after=3)
         self.pass_step()
+        
+        # --- Phase 4: Read Story & Trigger Like Feature ---
+        # We automatically land on the Story Book tab after feedback.
+        # Open the newly created story directly using the updated card coordinate.
+        self._open_new_story()
+        
+        # Read through the story to reach the Like button
+        self._swipe_story_forward()
+        self._like_story()           # Adds the story to the Favorites section
+        
+        # Close the storybook
+        self._swipe_story_backward()
+        self._close_storybook()
+        
+        # --- Phase 5: Validate Favourites & Dislike Toggle State ---
+        # Traverse to the Favourites tab to ensure the story appeared
+        self._navigate_to_favourite()
+        
+        # Open the story directly from the Favorites tab
+        self._open_story_from_favourite()
+        
+        # Read through to reach the Like/Dislike toggle
+        self._swipe_story_forward()
+        self._dislike_story()        # Toggles the Like off, removing it from Favorites
+        
+        # Close the storybook
+        self._swipe_story_backward()
+        self._close_storybook()
         
         # --- Exit ---
         self._exit_sequence()
@@ -174,6 +215,85 @@ class StorymakerNewUserFlowTest(BaseTalentTest):
         self.wait(wait_after, "Waiting for bot acknowledgement")
         self.take_screenshot(step_name)
 
+    # =========================================================================
+    # Extended Read / Like / Dislike Feature Setup
+    # =========================================================================
+    def _navigate_to_storybook_tab(self) -> None:
+        self.step("Navigate to Story Book", "Tapping on the Story Book tab")
+        tab_coords = self.coords.get("story_book_tab", [476, 77])
+        self.adb.tap(tab_coords[0], tab_coords[1])
+        self.wait(1)
+        self.take_screenshot("storybook_tab_selected")
+        self.pass_step()
+
+    def _navigate_to_favourite(self) -> None:
+        self.step("Navigate to Favourite", "Tapping on the Favourite tab")
+        tab_coords = self.coords.get("my_adventure_tab", [663, 67])
+        self.adb.tap(tab_coords[0], tab_coords[1])
+        self.wait(1)
+        self.take_screenshot("favourite_tab_selected")
+        self.pass_step()
+
+    def _open_new_story(self) -> None:
+        self.step("Open New Story", "Tapping on the first newly created story")
+        story_card = self.coords.get("new_first_story_card", [300, 400])
+        self.adb.tap(story_card[0], story_card[1])
+        self.wait(self.timings.get("step_delay", 2))
+        self.take_screenshot("new_story_opened")
+        self.pass_step()
+
+    def _open_story_from_favourite(self) -> None:
+        self.step("Open Story from Favourites", "Tapping on the first story in the Favourites tab")
+        story_card = self.coords.get("existing_first_story_card", [590, 370])
+        self.adb.tap(story_card[0], story_card[1])
+        self.wait(self.timings.get("step_delay", 2))
+        self.take_screenshot("favourite_story_opened")
+        self.pass_step()
+
+    def _swipe_story_forward(self) -> None:
+        swipe_count = self.timings.get("forward_swipe_count", 8)
+        self.step("Swipe Forward", f"Swiping forward through {swipe_count} story pages")
+        for i in range(swipe_count):
+            self.adb.swipe(1100, 360, 200, 360, 250)
+            self.wait(2)
+        self.pass_step()
+
+    def _swipe_story_backward(self) -> None:
+        swipe_count = self.timings.get("backward_swipe_count", 8)
+        self.step("Swipe Backward", f"Swiping backward through {swipe_count} story pages")
+        for i in range(swipe_count):
+            self.adb.swipe(200, 360, 1100, 360, 250)
+            self.wait(2)
+        self.pass_step()
+
+    def _like_story(self) -> None:
+        self.step("Like Story", "Tapping the like icon on the story")
+        like_coords = self.coords.get("like_icon", [325, 525])
+        self.adb.tap(640, 360)
+        self.wait(1)
+        self.adb.swipe(like_coords[0], like_coords[1], like_coords[0], like_coords[1], 250)
+        self.wait(self.timings.get("step_delay", 2))
+        self.take_screenshot("story_liked")
+        self.pass_step()
+
+    def _dislike_story(self) -> None:
+        self.step("Dislike Story", "Tapping the dislike icon to remove from favorites")
+        dislike_coords = self.coords.get("dislike_icon", [307, 475])
+        self.adb.tap(640, 360)
+        self.wait(1)
+        self.adb.swipe(dislike_coords[0], dislike_coords[1], dislike_coords[0], dislike_coords[1], 250)
+        self.wait(self.timings.get("step_delay", 2))
+        self.take_screenshot("story_disliked")
+        self.pass_step()
+
+    def _close_storybook(self) -> None:
+        self.step("Close Storybook", "Tapping cross icon to close storybook viewer")
+        close_coords = self.coords.get("close_storybook_icon", [40, 53])
+        self.adb.tap(close_coords[0], close_coords[1])
+        self.wait(self.timings.get("step_delay", 2))
+        self.take_screenshot("storybook_closed")
+        self.pass_step()
+
     def _exit_sequence(self) -> None:
         """Common exit logic to return to home."""
         self.step("Exit Sequence", "Exiting Storymaker to root")
@@ -197,6 +317,11 @@ class StorymakerNewUserFlowTest(BaseTalentTest):
 
     def verify(self) -> None:
         """Verify no crashes."""
+        # If any step previously failed, we abort verification immediately to save time
+        if any(s.status == TestStatus.FAILED for s in self.result.steps):
+            logger.info("Skipping verification due to previous test failure.")
+            return
+
         self.step("Final Verification")
         if self.verify_no_crash().passed:
             self.pass_step("Test completed without crashes")

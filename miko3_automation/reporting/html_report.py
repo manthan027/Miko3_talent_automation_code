@@ -8,8 +8,9 @@ pass/fail badges, RICE POT analysis, and detailed test results.
 import os
 import base64
 import logging
+import subprocess
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from ..rice_pot.analyzer import RICEPOTAnalyzer
 
@@ -89,15 +90,15 @@ class HTMLReportGenerator:
             f'border-radius:12px;font-size:12px;font-weight:600;">{status}</span>'
         )
 
-    def generate(self, output_path: str = "") -> str:
+    def generate(self, output_path: str = "") -> Tuple[str, Optional[str]]:
         """
-        Generate the HTML report.
+        Generate the HTML report and a PDF version.
 
         Args:
             output_path: Custom output path (default: auto-generated in output_dir).
 
         Returns:
-            Path to the generated report.
+            Tuple containing the path to the generated HTML report and the path to the PDF report (if successful).
         """
         if not output_path:
             os.makedirs(self.output_dir, exist_ok=True)
@@ -133,7 +134,51 @@ class HTMLReportGenerator:
             f.write(html)
 
         logger.info("Report generated: %s", output_path)
-        return output_path
+        
+        # Generate PDF
+        pdf_path = self._generate_pdf(output_path)
+        
+        return output_path, pdf_path
+
+    def _generate_pdf(self, html_path: str) -> Optional[str]:
+        """Convert the generated HTML report to PDF using MS Edge headless printing."""
+        try:
+            pdf_dir = os.path.join(self.output_dir, "pdf")
+            os.makedirs(pdf_dir, exist_ok=True)
+            
+            filename = os.path.basename(html_path).replace(".html", ".pdf")
+            pdf_path = os.path.join(pdf_dir, filename)
+            
+            # Common paths for Edge on Windows
+            edge_paths = [
+                r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+                r"C:\Program Files\Microsoft\Edge\Application\msedge.exe"
+            ]
+            
+            edge_exe = next((p for p in edge_paths if os.path.exists(p)), None)
+            
+            if not edge_exe:
+                logger.warning("Could not find MS Edge; skipping PDF generation.")
+                return None
+                
+            abs_html = os.path.abspath(html_path)
+            abs_pdf = os.path.abspath(pdf_path)
+            
+            logger.info("Generating PDF report...")
+            subprocess.run(
+                [edge_exe, "--headless", f"--print-to-pdf={abs_pdf}", f"file:///{abs_html.replace(chr(92), '/')}"],
+                check=True,
+                capture_output=True,
+                timeout=30
+            )
+            
+            if os.path.exists(pdf_path):
+                logger.info("PDF Report generated: %s", pdf_path)
+                return pdf_path
+            return None
+        except Exception as e:
+            logger.error("Failed to generate PDF report: %s", e)
+            return None
 
     def _build_html(self, total, passed, failed, errors, duration, rice_data) -> str:
         """Build the complete HTML document."""
@@ -149,8 +194,8 @@ class HTMLReportGenerator:
         * {{ margin: 0; padding: 0; box-sizing: border-box; }}
         body {{
             font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-            background: #0f172a;
-            color: #e2e8f0;
+            background: #f8fafc;
+            color: #1e293b;
             line-height: 1.6;
             padding: 20px;
         }}
@@ -158,20 +203,21 @@ class HTMLReportGenerator:
 
         /* Header */
         .header {{
-            background: linear-gradient(135deg, #1e293b, #334155);
+            background: linear-gradient(135deg, #ffffff, #f1f5f9);
             border-radius: 16px;
             padding: 32px;
             margin-bottom: 24px;
-            border: 1px solid #475569;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05);
         }}
         .header h1 {{
             font-size: 28px;
-            background: linear-gradient(to right, #60a5fa, #a78bfa);
+            background: linear-gradient(to right, #3b82f6, #8b5cf6);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             margin-bottom: 8px;
         }}
-        .header .meta {{ color: #94a3b8; font-size: 14px; }}
+        .header .meta {{ color: #64748b; font-size: 14px; }}
 
         /* Summary Cards */
         .summary-grid {{
@@ -181,12 +227,13 @@ class HTMLReportGenerator:
             margin-bottom: 24px;
         }}
         .card {{
-            background: #1e293b;
+            background: #ffffff;
             border-radius: 12px;
             padding: 20px;
             text-align: center;
-            border: 1px solid #334155;
+            border: 1px solid #e2e8f0;
             transition: transform 0.2s;
+            box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
         }}
         .card:hover {{ transform: translateY(-2px); }}
         .card .value {{
@@ -194,20 +241,21 @@ class HTMLReportGenerator:
             font-weight: 700;
             margin: 8px 0;
         }}
-        .card .label {{ color: #94a3b8; font-size: 13px; text-transform: uppercase; }}
+        .card .label {{ color: #64748b; font-size: 13px; text-transform: uppercase; font-weight: 600; }}
         .card.pass .value {{ color: #10b981; }}
         .card.fail .value {{ color: #ef4444; }}
         .card.error .value {{ color: #f59e0b; }}
-        .card.total .value {{ color: #60a5fa; }}
-        .card.time .value {{ color: #a78bfa; font-size: 24px; }}
+        .card.total .value {{ color: #2563eb; }}
+        .card.time .value {{ color: #7c3aed; font-size: 24px; }}
 
         /* Progress Bar */
         .progress-bar {{
-            background: #334155;
+            background: #e2e8f0;
             border-radius: 8px;
             height: 12px;
             overflow: hidden;
             margin-bottom: 24px;
+            box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.05);
         }}
         .progress-fill {{
             height: 100%;
@@ -217,24 +265,26 @@ class HTMLReportGenerator:
 
         /* Device Info */
         .device-info {{
-            background: #1e293b;
+            background: #ffffff;
             border-radius: 12px;
             padding: 20px;
             margin-bottom: 24px;
-            border: 1px solid #334155;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
         }}
-        .device-info h3 {{ color: #60a5fa; margin-bottom: 12px; }}
+        .device-info h3 {{ color: #2563eb; margin-bottom: 12px; }}
         .device-info table {{ width: 100%; }}
-        .device-info td {{ padding: 4px 12px; }}
-        .device-info td:first-child {{ color: #94a3b8; width: 160px; }}
+        .device-info td {{ padding: 6px 12px; border-bottom: 1px solid #f1f5f9; }}
+        .device-info td:first-child {{ color: #64748b; width: 160px; font-weight: 500; }}
 
         /* Section */
         .section {{
-            background: #1e293b;
+            background: #ffffff;
             border-radius: 12px;
             margin-bottom: 16px;
-            border: 1px solid #334155;
+            border: 1px solid #e2e8f0;
             overflow: hidden;
+            box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
         }}
         .section-header {{
             padding: 16px 20px;
@@ -242,38 +292,41 @@ class HTMLReportGenerator:
             display: flex;
             justify-content: space-between;
             align-items: center;
-            border-bottom: 1px solid #334155;
+            border-bottom: 1px solid #e2e8f0;
+            background: #ffffff;
         }}
-        .section-header:hover {{ background: #243048; }}
-        .section-header h3 {{ font-size: 16px; }}
-        .section-body {{ padding: 20px; display: none; }}
+        .section-header:hover {{ background: #f8fafc; }}
+        .section-header h3 {{ font-size: 16px; color: #1e293b; }}
+        .section-body {{ padding: 20px; display: none; background: #ffffff; }}
         .section.open .section-body {{ display: block; }}
 
         /* Steps Table */
         .steps-table {{ width: 100%; border-collapse: collapse; margin: 12px 0; }}
         .steps-table th {{
-            background: #334155;
-            padding: 8px 12px;
+            background: #f1f5f9;
+            padding: 10px 12px;
             text-align: left;
             font-size: 12px;
             text-transform: uppercase;
-            color: #94a3b8;
+            color: #475569;
+            font-weight: 600;
         }}
-        .steps-table td {{ padding: 8px 12px; border-bottom: 1px solid #1e293b; font-size: 14px; }}
-        .steps-table tr:hover {{ background: #243048; }}
+        .steps-table td {{ padding: 10px 12px; border-bottom: 1px solid #e2e8f0; font-size: 14px; }}
+        .steps-table tr:hover {{ background: #f8fafc; }}
 
         /* Screenshots */
         .screenshots {{
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-            gap: 12px;
+            gap: 16px;
             margin: 16px 0;
         }}
         .screenshot-card {{
-            background: #0f172a;
+            background: #ffffff;
             border-radius: 8px;
             overflow: hidden;
-            border: 1px solid #334155;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
         }}
         .screenshot-card img {{
             width: 100%;
@@ -281,33 +334,37 @@ class HTMLReportGenerator:
             display: block;
         }}
         .screenshot-card .caption {{
-            padding: 8px;
-            font-size: 12px;
-            color: #94a3b8;
+            padding: 10px;
+            font-size: 13px;
+            color: #64748b;
             text-align: center;
+            background: #f8fafc;
+            border-top: 1px solid #e2e8f0;
         }}
 
         /* RICE Table */
         .rice-table {{ width: 100%; border-collapse: collapse; margin: 12px 0; }}
         .rice-table th {{
-            background: #334155;
-            padding: 10px 14px;
+            background: #f1f5f9;
+            padding: 12px 14px;
             text-align: center;
             font-size: 13px;
-            color: #94a3b8;
+            color: #475569;
+            font-weight: 600;
         }}
         .rice-table td {{
-            padding: 10px 14px;
+            padding: 12px 14px;
             text-align: center;
-            border-bottom: 1px solid #334155;
+            border-bottom: 1px solid #e2e8f0;
         }}
-        .rice-table td:first-child {{ text-align: left; font-weight: 600; }}
+        .rice-table td:first-child {{ text-align: left; font-weight: 600; color: #1e293b; }}
+        .rice-table tr:hover {{ background: #f8fafc; }}
 
         /* Logcat */
         .logcat {{
-            background: #0f172a;
+            background: #f8fafc;
             border-radius: 8px;
-            padding: 12px;
+            padding: 16px;
             font-family: 'Cascadia Code', 'Fira Code', monospace;
             font-size: 12px;
             line-height: 1.5;
@@ -315,32 +372,34 @@ class HTMLReportGenerator:
             overflow-y: auto;
             white-space: pre-wrap;
             word-break: break-all;
-            color: #94a3b8;
-            border: 1px solid #334155;
+            color: #334155;
+            border: 1px solid #e2e8f0;
         }}
 
         /* Badge */
         .badge {{
             display: inline-block;
-            padding: 3px 10px;
+            padding: 4px 12px;
             border-radius: 12px;
             font-size: 12px;
             font-weight: 600;
             color: white;
+            box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
         }}
         .badge-pass {{ background: #10b981; }}
         .badge-fail {{ background: #ef4444; }}
         .badge-error {{ background: #f59e0b; }}
-        .badge-skip {{ background: #6b7280; }}
+        .badge-skip {{ background: #64748b; }}
 
         /* Print */
         @media print {{
             body {{ background: white; color: black; }}
             .section-body {{ display: block !important; }}
-            .card {{ border: 1px solid #ccc; }}
+            .card {{ border: 1px solid #ccc; box-shadow: none; }}
+            .section {{ box-shadow: none; }}
         }}
 
-        .chevron {{ transition: transform 0.3s; }}
+        .chevron {{ transition: transform 0.3s; color: #94a3b8; margin-right: 8px; }}
         .section.open .chevron {{ transform: rotate(90deg); }}
 
         /* Pie Chart Dashboard */
@@ -353,10 +412,11 @@ class HTMLReportGenerator:
         .dashboard-card {{
             flex: 1;
             min-width: 300px;
-            background: #1e293b;
+            background: #ffffff;
             border-radius: 12px;
             padding: 24px;
-            border: 1px solid #334155;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
         }}
         .pie-container {{
             display: flex;
@@ -374,12 +434,13 @@ class HTMLReportGenerator:
                 #f59e0b var(--fail-p) 100%
             );
             position: relative;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
         }}
         .pie-chart::after {{
             content: "";
             position: absolute;
             inset: 30px;
-            background: #1e293b;
+            background: #ffffff;
             border-radius: 50%;
         }}
         .pie-legend {{ list-style: none; }}
@@ -389,41 +450,46 @@ class HTMLReportGenerator:
             gap: 8px;
             margin-bottom: 8px;
             font-size: 14px;
+            color: #475569;
+            font-weight: 500;
         }}
         .dot {{ width: 12px; height: 12px; border-radius: 3px; }}
 
         /* Executive Summary */
         .exec-summary {{
             font-size: 16px;
-            color: #cbd5e1;
+            color: #475569;
             padding: 24px;
-            background: #1e293b;
+            background: #ffffff;
             border-radius: 12px;
             margin-bottom: 24px;
-            border-left: 4px solid #60a5fa;
-            border-top: 1px solid #334155;
-            border-right: 1px solid #334155;
-            border-bottom: 1px solid #334155;
+            border-left: 4px solid #3b82f6;
+            border-top: 1px solid #e2e8f0;
+            border-right: 1px solid #e2e8f0;
+            border-bottom: 1px solid #e2e8f0;
+            box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
         }}
-        .exec-summary h2 {{ color: #60a5fa; margin-bottom: 12px; font-size: 20px; }}
+        .exec-summary h2 {{ color: #2563eb; margin-bottom: 12px; font-size: 20px; }}
         .exec-summary p {{ margin-bottom: 12px; }}
 
         /* Action Items */
         .action-card {{
-            background: #450a0a;
-            border: 1px solid #ef4444;
+            background: #fef2f2;
+            border: 1px solid #fca5a5;
             border-radius: 12px;
             padding: 20px;
             margin-bottom: 24px;
+            box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.05);
         }}
-        .action-card h3 {{ color: #f87171; margin-bottom: 12px; }}
+        .action-card h3 {{ color: #dc2626; margin-bottom: 12px; }}
         .action-list {{ list-style: none; }}
         .action-list li {{
-            padding: 8px 0;
-            border-bottom: 1px solid #7f1d1d;
+            padding: 10px 0;
+            border-bottom: 1px solid #fecaca;
             font-size: 14px;
+            color: #991b1b;
         }}
-        .action-list li:last-child {{ border-bottom: none; }}
+        .action-list li:last-child {{ border-bottom: none; padding-bottom: 0; }}
     </style>
 </head>
 <body>
@@ -434,7 +500,7 @@ class HTMLReportGenerator:
             <div class="meta">
                 Generated: {now.strftime('%B %d, %Y at %H:%M:%S')} |
                 Duration: {duration:.1f}s |
-                Framework v1.0.0
+                Framework v9.5.1
             </div>
         </div>
 
@@ -454,7 +520,7 @@ class HTMLReportGenerator:
                 <div class="exec-summary">
                     <h2>📝 Executive Summary</h2>
                     <p>{self._get_summary_description(total, passed, failed, errors)}</p>
-                    <div class="meta">
+                    <div class="meta" style="color: #64748b; font-size: 14px;">
                         <strong>Environment:</strong> {self.device_info.get('model', 'Unknown Miko')} | 
                         <strong>Success Rate:</strong> {(passed/max(total,1))*100:.1f}%
                     </div>
@@ -474,16 +540,16 @@ class HTMLReportGenerator:
         {self._build_device_section()}
 
         <!-- Test Results -->
-        <h2 style="margin:24px 0 16px;color:#60a5fa;">📋 Test Results</h2>
+        <h2 style="margin:24px 0 16px;color:#2563eb;">📋 Test Results</h2>
         {self._build_results_sections()}
 
         <!-- RICE POT Analysis -->
-        <h2 style="margin:24px 0 16px;color:#a78bfa;">📊 RICE POT Prioritization</h2>
+        <h2 style="margin:24px 0 16px;color:#7c3aed;">📊 RICE POT Prioritization</h2>
         {self._build_rice_section(rice_data)}
 
         <!-- Footer -->
-        <div style="text-align:center;padding:24px;color:#475569;font-size:13px;">
-            Miko3 Talents Automation Framework v1.0.0 • Report generated with ❤️
+        <div style="text-align:center;padding:24px;color:#64748b;font-size:13px;">
+            Miko3 Talents Automation Framework v9.5.1 • Report generated with ❤️
         </div>
     </div>
 
@@ -536,7 +602,7 @@ class HTMLReportGenerator:
                 steps_rows = ""
                 for step in result.steps:
                     step_badge = self._status_badge(step.status)
-                    err = f'<br><small style="color:#ef4444;">{step.error_message}</small>' if step.error_message else ""
+                    err = f'<br><span style="color:#ef4444;font-size:12px;font-weight:500;">{step.error_message}</span>' if step.error_message else ""
                     steps_rows += f"""
                     <tr>
                         <td>{step.name}</td>
@@ -546,7 +612,7 @@ class HTMLReportGenerator:
                     </tr>"""
 
                 steps_html = f"""
-                <h4 style="margin:12px 0 8px;color:#94a3b8;">Steps</h4>
+                <h4 style="margin:16px 0 8px;color:#475569;">Steps</h4>
                 <table class="steps-table">
                     <thead><tr><th>Step</th><th>Status</th><th>Duration</th><th>Details</th></tr></thead>
                     <tbody>{steps_rows}</tbody>
@@ -568,7 +634,7 @@ class HTMLReportGenerator:
 
                 if cards:
                     screenshots_html = f"""
-                    <h4 style="margin:12px 0 8px;color:#94a3b8;">📸 Screenshots</h4>
+                    <h4 style="margin:16px 0 8px;color:#475569;">📸 Screenshots</h4>
                     <div class="screenshots">{cards}</div>"""
 
             # Logcat excerpt
@@ -577,14 +643,14 @@ class HTMLReportGenerator:
                 excerpt = result.logcat_excerpt[:5000]  # Limit size
                 excerpt = excerpt.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
                 logcat_html = f"""
-                <h4 style="margin:12px 0 8px;color:#94a3b8;">📝 Logcat</h4>
+                <h4 style="margin:16px 0 8px;color:#475569;">📝 Logcat</h4>
                 <div class="logcat">{excerpt}</div>"""
 
             # Error message
             error_html = ""
             if result.error_message:
                 error_html = f"""
-                <div style="background:#7f1d1d;padding:12px;border-radius:8px;margin:12px 0;border:1px solid #ef4444;">
+                <div style="background:#fee2e2;padding:16px;border-radius:8px;margin:12px 0;border:1px solid #fca5a5;color:#991b1b;">
                     <strong>Error:</strong> {result.error_message}
                 </div>"""
 
@@ -596,7 +662,7 @@ class HTMLReportGenerator:
                         {result.talent_name}
                         <span class="badge {badge_class}" style="margin-left:12px;">{status}</span>
                     </h3>
-                    <span style="color:#94a3b8;font-size:13px;">
+                    <span style="color:#64748b;font-size:13px;font-weight:500;">
                         {result.step_summary} • {result.duration:.1f}s
                     </span>
                 </div>
@@ -621,7 +687,7 @@ class HTMLReportGenerator:
                 <td>{score['impact']}</td>
                 <td>{score['confidence']}</td>
                 <td>{score['effort']}</td>
-                <td style="font-weight:700;color:#60a5fa;">{score['rice_score']}</td>
+                <td style="font-weight:700;color:#2563eb;">{score['rice_score']}</td>
                 <td>{score['priority']}</td>
             </tr>"""
 
@@ -645,7 +711,7 @@ class HTMLReportGenerator:
                     </thead>
                     <tbody>{rows}</tbody>
                 </table>
-                <p style="margin-top:12px;color:#94a3b8;font-size:13px;">
+                <p style="margin-top:12px;color:#64748b;font-size:13px;">
                     Formula: Score = (Reach × Impact × Confidence) / Effort — Higher is better
                 </p>
             </div>

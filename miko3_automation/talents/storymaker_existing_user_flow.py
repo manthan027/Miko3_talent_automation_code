@@ -46,6 +46,12 @@ class StorymakerExistingUserFlowTest(BaseTalentTest):
             return
         self.pass_step()
 
+        # TC 01.1 Talent Stabilization
+        self.step("Stabilization", "Waiting for Storymaker to load")
+        logger.info("Waiting 8 seconds for talent to stabilize...")
+        self.wait(8, "Stabilization wait")
+        self.pass_step()
+
         # TC 02 Handle AI Disclaimer
         self.step("AI Disclaimer", "Handling initial disclaimer prompt")
         disc_coords = self.coords.get("ai_disclaimer_cross", [154, 120])
@@ -78,19 +84,36 @@ class StorymakerExistingUserFlowTest(BaseTalentTest):
         # TC 07 Step 7: Close storybook viewer ---
         self._close_storybook()
 
-        # TC 08 Step 8: Delete story (deny first, then confirm) ---
-        self._delete_story_flow()
-
-        # TC 09 Step 9: Navigate to Favourite tab ---
+        # TC 08 Step 8: Navigate to the Favourite tab to verify the 'Like' worked ---
         self._navigate_to_favourite()
 
-        # TC 10 Step 10: Navigate to Story Book tab ---
+        # TC 09 Step 9: Open the favorited story from the Favourite tab ---
+        self._open_story_from_favourite()
+
+        # TC 10 Step 10: Swipe forward 8 pages to reach the ending screen ---
+        self._swipe_story_forward()
+
+        # TC 11 Step 11: Dislike the story (toggles the Like off to remove from Favorites) ---
+        self._dislike_story()
+
+        # TC 12 Step 12: Swipe backward 8 pages to origin ---
+        self._swipe_story_backward()
+
+        # TC 13 Step 13: Close storybook viewer ---
+        self._close_storybook()
+
+        # TC 14 Step 14: Navigate back to the main Story Book tab ---
         self._navigate_to_storybook_tab()
 
-        # TC 11 Step 11: Check Stories Left for the Month ---
+        # TC 15 Step 15: Delete story from the main tab (deny first, then confirm) ---
+        if not self._delete_story_flow():
+            logger.error("Execution aborted: Story deletion step failed.")
+            return
+
+        # TC 16 Step 16: Check Stories Left for the Month ---
         self._check_stories_left()
 
-        # TC 12 Step 12: Full exit sequence ---
+        # TC 17 Step 17: Full exit sequence ---
         self._exit_sequence()
 
     def _swipe_story_forward(self) -> None:
@@ -135,7 +158,33 @@ class StorymakerExistingUserFlowTest(BaseTalentTest):
         self.take_screenshot("storybook_closed")
         self.pass_step("Storybook viewer closed")
 
-    def _delete_story_flow(self) -> None:
+    def _open_story_from_favourite(self) -> None:
+        """Tap the first story inside the Favourite tab to open it."""
+        self.step("Open Story from Favourites", "Tapping on the first story in the Favourites tab")
+        story_card = self.coords.get("favourite_first_story_card", [191, 383])
+        self.adb.tap(story_card[0], story_card[1])
+        self.wait(self.timings.get("step_delay", 2))
+        self.take_screenshot("favourite_story_opened")
+        self.pass_step("Opened story from favourites")
+
+    def _dislike_story(self) -> None:
+        """Tap the Dislike button on the current story page."""
+        self.step("Dislike Story", "Tapping the dislike icon to remove from favorites")
+        dislike_coords = self.coords.get("dislike_icon", [307, 475])
+        
+        # Tap center to ensure HUD is awake
+        logger.info("Tapping center screen to ensure HUD overlay is awake")
+        self.adb.tap(640, 360)
+        self.wait(1)
+
+        logger.info(f"Performing firm press on Dislike button at {dislike_coords}")
+        self.adb.swipe(dislike_coords[0], dislike_coords[1], dislike_coords[0], dislike_coords[1], 250)
+        
+        self.wait(self.timings.get("step_delay", 2))
+        self.take_screenshot("story_disliked")
+        self.pass_step("Story disliked successfully")
+
+    def _delete_story_flow(self) -> bool:
         """Test the delete story flow: tap delete, deny first, then confirm delete."""
         self.step("Delete Story Flow", "Testing delete: deny once, then confirm")
 
@@ -167,9 +216,11 @@ class StorymakerExistingUserFlowTest(BaseTalentTest):
         if popup_detected:
             logger.info("'Story deleted successfully' popup detected — DELETE PASS")
             self.pass_step("Story deleted successfully popup confirmed")
+            return True
         else:
             logger.warning("'Story deleted successfully' popup NOT detected — DELETE FAIL")
             self.fail_step("Story deleted successfully popup was not visible after delete")
+            return False
 
 
     def _wait_for_delete_popup(self, timeout: int = 5) -> bool:
@@ -286,8 +337,13 @@ class StorymakerExistingUserFlowTest(BaseTalentTest):
         # Open stories-left counter
         stories_left_coords = self.coords.get("stories_left_icon", [1216, 66])
         self.adb.tap(stories_left_coords[0], stories_left_coords[1])
-        self.wait(3)
+        self.wait(2)
         self.take_screenshot("stories_left_popup")
+
+        # Close stories popup
+        close_stories_popup_coords = self.coords.get("close_stories_popup", [186, 185])
+        self.adb.tap(close_stories_popup_coords[0], close_stories_popup_coords[1])
+        self.wait(2)
 
         # Close popup with cross icon
         close_popup_coords = self.coords.get("close_stories_left_popup", [71, 73])
@@ -332,6 +388,11 @@ class StorymakerExistingUserFlowTest(BaseTalentTest):
 
     def verify(self) -> None:
         """Verify no crashes."""
+        # If any step previously failed, we abort verification immediately to save time
+        if any(s.status == TestStatus.FAILED for s in self.result.steps):
+            logger.info("Skipping verification due to previous test failure.")
+            return
+
         self.step("Final Verification")
         if self.verify_no_crash().passed:
             self.pass_step("Test completed without crashes")

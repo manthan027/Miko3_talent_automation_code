@@ -97,8 +97,8 @@ talents:
       # New coordinates for tabs and viewer
       story_book_tab: [476, 77]
       my_adventure_tab: [663, 67]
-      like_icon: [1114, 630]        # "Yes" button in Viewer
-      dislike_icon: [892, 620]     # "No" button in Viewer
+      like_icon: [325, 525]        # "like" button in Viewer
+      dislike_icon: [307, 475]     # "dislike" button in Viewer
       new_first_story_card: [300, 400] # New User First story in list
       existing_first_story_card: [590, 370] # Existing User First story in list
 

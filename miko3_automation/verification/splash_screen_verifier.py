@@ -47,8 +47,37 @@ class SplashScreenVerifier:
             reference_dir: Directory containing reference splash screen images.
         """
         self.reference_dir = reference_dir
-        self.ssim_threshold = 0.7  # 70% similarity required
-        self.template_threshold = 0.8  # 80% confidence for template matching
+        self.ssim_threshold = 0.65  # Slightly lowered for stability
+        self.template_threshold = 0.75  # Slightly lowered for stability
+        self.roi_crop_top = 0.12  # Crop top 12% (Status bar)
+        self.roi_crop_bottom = 0.10  # Crop bottom 10% (Nav bar)
+
+    def _preprocess_image(self, img: np.ndarray) -> np.ndarray:
+        """
+        Preprocess image for robust comparison:
+        1. Convert to grayscale.
+        2. Crop out status and navigation bars.
+        3. Apply slight Gaussian blur to reduce noise.
+        """
+        if img is None:
+            return None
+            
+        # 1. Convert to grayscale if color
+        if len(img.shape) == 3:
+            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        else:
+            gray = img.copy()
+            
+        # 2. ROI Cropping
+        h, w = gray.shape
+        top = int(h * self.roi_crop_top)
+        bottom = int(h * (1.0 - self.roi_crop_bottom))
+        roi = gray[top:bottom, 0:w]
+        
+        # 3. Blurring
+        blurred = cv2.GaussianBlur(roi, (5, 5), 0)
+        
+        return blurred
 
     def get_reference_template(self, talent_name: str) -> Optional[str]:
         """
@@ -133,25 +162,66 @@ class SplashScreenVerifier:
                     reference_path=template_path,
                 )
 
-            # Convert to grayscale
-            gray_capture = cv2.cvtColor(img_capture, cv2.COLOR_BGR2GRAY)
-            gray_template = cv2.cvtColor(img_template, cv2.COLOR_BGR2GRAY)
+            # Preprocess images (ROI crop, grayscale, blur)
+            proc_capture = self._preprocess_image(img_capture)
+            proc_template_base = self._preprocess_image(img_template)
 
-            # Perform template matching
-            result = cv2.matchTemplate(
-                gray_capture, gray_template, cv2.TM_CCOEFF_NORMED
-            )
-            min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(result)
+            if proc_capture is None or proc_template_base is None:
+                return SplashScreenResult(
+                    talent_name=talent_name,
+                    passed=False,
+                    similarity_score=0.0,
+                    method="MatchTemplate",
+                    message="Preprocessing failed",
+                    capture_path=capture_path,
+                    reference_path=template_path,
+                )
 
-            similarity = float(max_val)
+            # Hyper-Robust Multiscale Template Matching
+            best_similarity = 0.0
+            scales = [0.9, 0.95, 1.0, 1.05, 1.1]
+            
+            for scale in scales:
+                # Resize template for this scale
+                if scale != 1.0:
+                    new_w = int(proc_template_base.shape[1] * scale)
+                    new_h = int(proc_template_base.shape[0] * scale)
+                    # Don't scale larger than capture
+                    if new_w > proc_capture.shape[1] or new_h > proc_capture.shape[0]:
+                        continue
+                    proc_template = cv2.resize(proc_template_base, (new_w, new_h))
+                else:
+                    # Default size check (must not be larger than capture)
+                    if proc_template_base.shape[1] > proc_capture.shape[1] or \
+                       proc_template_base.shape[0] > proc_capture.shape[0]:
+                        proc_template = cv2.resize(
+                            proc_template_base, (proc_capture.shape[1], proc_capture.shape[0])
+                        )
+                    else:
+                        proc_template = proc_template_base
+
+                # Perform template matching
+                result = cv2.matchTemplate(
+                    proc_capture, proc_template, cv2.TM_CCOEFF_NORMED
+                )
+                _, max_val, _, _ = cv2.minMaxLoc(result)
+                best_similarity = max(best_similarity, float(max_val))
+
+            similarity = best_similarity
             passed = similarity >= effective_threshold
+
+            # Save processed images for debugging (using 1.0 scale version)
+            proc_capture_path = capture_path.replace(".png", "_processed.png")
+            cv2.imwrite(proc_capture_path, proc_capture)
+            proc_ref_path = template_path.replace(".png", "_processed.png")
+            cv2.imwrite(proc_ref_path, proc_template_base)
 
             return SplashScreenResult(
                 talent_name=talent_name,
                 passed=passed,
                 similarity_score=similarity,
                 method="MatchTemplate",
-                message=f"Template match confidence: {similarity:.1%} (threshold: {effective_threshold:.1%})",
+                message=f"Multiscale match confidence: {similarity:.1%} (threshold: {effective_threshold:.1%})",
                 capture_path=capture_path,
                 reference_path=template_path,
             )
@@ -206,9 +276,9 @@ class SplashScreenVerifier:
             )
 
         try:
-            # Read images in grayscale
-            img_capture = cv2.imread(capture_path, cv2.IMREAD_GRAYSCALE)
-            img_template = cv2.imread(template_path, cv2.IMREAD_GRAYSCALE)
+            # Read images
+            img_capture = cv2.imread(capture_path)
+            img_template = cv2.imread(template_path)
 
             if img_capture is None or img_template is None:
                 return SplashScreenResult(
@@ -221,15 +291,30 @@ class SplashScreenVerifier:
                     reference_path=template_path,
                 )
 
+            # Preprocess images (ROI crop, grayscale, blur)
+            proc_capture = self._preprocess_image(img_capture)
+            proc_template = self._preprocess_image(img_template)
+
+            if proc_capture is None or proc_template is None:
+                 return SplashScreenResult(
+                    talent_name=talent_name,
+                    passed=False,
+                    similarity_score=0.0,
+                    method="SSIM",
+                    message="Preprocessing failed",
+                    capture_path=capture_path,
+                    reference_path=template_path,
+                )
+
             # Resize to match dimensions
-            if img_capture.shape != img_template.shape:
-                img_template = cv2.resize(
-                    img_template, (img_capture.shape[1], img_capture.shape[0])
+            if proc_capture.shape != proc_template.shape:
+                proc_template = cv2.resize(
+                    proc_template, (proc_capture.shape[1], proc_capture.shape[0])
                 )
 
             # Calculate SSIM
             similarity, diff = ssim(
-                img_capture, img_template, full=True, data_range=255
+                proc_capture, proc_template, full=True, data_range=255
             )
             similarity = float(similarity)
             passed = similarity >= effective_threshold

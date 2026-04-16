@@ -182,6 +182,7 @@ class BaseTalentTest(ABC):
         )
         self._current_step: Optional[TestStep] = None
         self._step_count = 0
+        self.last_launch_time = 0.0  # Timestamp of the moment of click/launch
 
     def run(self) -> TestResult:
         """
@@ -771,6 +772,7 @@ Wend
                 break
 
         self.step("Launch talent", f"Starting {self.package_name}")
+        self.last_launch_time = time.time()  # Start the countdown from here
         
         # Check if we should use click-based or search-based launching instead
         talent_cfg = self.config.get("talents", {})
